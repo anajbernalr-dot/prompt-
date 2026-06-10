@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 
+import AuthScreen from '../screens/AuthScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import OrganizerSetupScreen from '../screens/OrganizerSetupScreen';
 import StandJoinScreen from '../screens/StandJoinScreen';
@@ -74,8 +75,9 @@ export default function AppNavigator() {
           cardStyle: { backgroundColor: Colors.background },
           animationEnabled: true,
         }}
-        initialRouteName="Onboarding"
+        initialRouteName="Auth"
       >
+        <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="OrganizerSetup" component={OrganizerSetupScreen} />
         <Stack.Screen name="StandJoin" component={StandJoinScreen} />
