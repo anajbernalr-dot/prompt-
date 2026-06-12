@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F7;
+  --bg-elevated: #FFFFFF;
+  --surface: #F5F5F7;
+  --surface-2: #E8E8ED;
+  --border: #D2D2D7;
+  --text-primary: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --text-tertiary: #AEAEB2;
+  --accent-green: #00C853;
+  --accent-green-rgb: 0, 200, 83;
+  --accent-amber: #FF9500;
+  --accent-red: #FF3B30;
+  --accent-blue: #007AFF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+  --text-display: 36px;
+
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0A0A0F;
+  --bg-elevated: #111118;
+  --surface: #16162A;
+  --surface-2: #1E1E30;
+  --border: #2A2A40;
+  --text-primary: #F5F5F7;
+  --text-secondary: #8E8EA0;
+  --text-tertiary: #48485A;
+  --accent-green: #00FF7F;
+  --accent-green-rgb: 0, 255, 127;
+  --accent-amber: #FFB800;
+  --accent-red: #FF3B5C;
+  --accent-blue: #4A9EFF;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+html, body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+  transition: background 250ms var(--ease-out), color 250ms var(--ease-out);
+}
+
+* { box-sizing: border-box; }
+
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; }
+
+/* Page transition */
+.page-enter {
+  animation: pageIn 200ms var(--ease-out) both;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Break-even milestone flash */
+.milestone-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 100;
+  background: rgba(var(--accent-green-rgb), 0.12);
+  animation: flashOut 1.5s var(--ease-out) forwards;
+}
+@keyframes flashOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Tactile tap */
+.tap-scale {
+  transition: transform 120ms var(--spring);
+}
+.tap-scale:active {
+  transform: scale(0.94);
+}
+
+/* Panic pulse */
+@keyframes panicPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0); }
+}
+.panic-pulse { animation: panicPulse 2s ease-in-out infinite; }
+
+::-webkit-scrollbar { width: 0; height: 0; }
