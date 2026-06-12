@@ -20,8 +20,10 @@ type Props = {
 export default function OnboardingScreen({ navigation }: Props) {
   const setCurrentUser = useStore((s) => s.setCurrentUser);
   const setUserRole = useStore((s) => s.setUserRole);
-  const [userName, setUserName] = useState('');
-  const [step, setStep] = useState<'name' | 'role'>('name');
+  const currentUser = useStore((s) => s.currentUser);
+  const [userName, setUserName] = useState(currentUser?.name ?? '');
+  // Authenticated users already gave their name at registration — skip straight to role
+  const [step, setStep] = useState<'name' | 'role'>(currentUser?.name ? 'role' : 'name');
 
   const handleContinue = () => {
     if (!userName.trim()) return;
@@ -45,7 +47,7 @@ export default function OnboardingScreen({ navigation }: Props) {
         <View style={styles.logoArea}>
           <Text style={styles.logoIcon}>📊</Text>
           <Text style={styles.appName}>PopUp Analytics</Text>
-          <Text style={styles.tagline}>Comercio transitori. Datos reales.</Text>
+          <Text style={styles.tagline}>Comercio transitorio. Datos reales.</Text>
         </View>
 
         {step === 'name' ? (
