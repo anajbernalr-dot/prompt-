@@ -21,20 +21,25 @@ export default function StandJoinScreen({ navigation }: Props) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     const trimmed = code.trim().toUpperCase();
     if (!trimmed) return;
     setLoading(true);
-    const success = joinEvent(trimmed);
-    setLoading(false);
-    if (success) {
-      navigation.navigate('StandSetup');
-    } else {
-      Alert.alert(
-        'Código no encontrado',
-        'El código ingresado no es válido. Verifica con el organizador del evento.',
-        [{ text: 'Intentar de nuevo' }]
-      );
+    try {
+      const success = await joinEvent(trimmed);
+      if (success) {
+        navigation.navigate('StandSetup');
+      } else {
+        Alert.alert(
+          'Código no encontrado',
+          'El código ingresado no es válido. Verifica con el organizador del evento.',
+          [{ text: 'Intentar de nuevo' }]
+        );
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'No se pudo conectar con el servidor.');
+    } finally {
+      setLoading(false);
     }
   };
 

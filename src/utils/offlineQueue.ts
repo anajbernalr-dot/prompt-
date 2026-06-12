@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { transactionsApi } from '../services/api';
+import { api } from '../services/api';
+const transactionsApi = api.transactions;
 
 const QUEUE_KEY = '@popup_offline_queue';
 

@@ -27,12 +27,12 @@ export default function OrganizerSetupScreen({ navigation }: Props) {
   const [planType, setPlanType] = useState<'starter' | 'growth' | 'macro'>('starter');
   const [createdCode, setCreatedCode] = useState<string | null>(null);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!eventName.trim() || !location.trim()) {
       Alert.alert('Error', 'Por favor completa nombre y ubicación del evento.');
       return;
     }
-    const code = createEvent({
+    const code = await createEvent({
       name: eventName.trim(),
       location: location.trim(),
       date,

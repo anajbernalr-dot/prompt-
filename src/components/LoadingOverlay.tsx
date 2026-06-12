@@ -1,46 +1,46 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet, Text, Modal } from 'react-native';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { Colors } from '../theme/colors';
 
-interface LoadingOverlayProps {
+interface Props {
   visible: boolean;
   message?: string;
 }
 
-export default function LoadingOverlay({ visible, message }: LoadingOverlayProps) {
+export function LoadingOverlay({ visible, message }: Props) {
+  if (!visible) return null;
   return (
-    <Modal transparent animationType="fade" visible={visible} statusBarTranslucent>
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-        </View>
+    <View style={styles.overlay}>
+      <View style={styles.box}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        {message && <Text style={styles.message}>{message}</Text>}
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: 'center',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
   },
-  container: {
+  box: {
     backgroundColor: Colors.card,
     borderRadius: 16,
-    padding: 32,
+    padding: 28,
     alignItems: 'center',
-    minWidth: 120,
-    gap: 16,
+    gap: 14,
     borderWidth: 1,
     borderColor: Colors.border,
+    minWidth: 140,
   },
   message: {
     color: Colors.text,
     fontSize: 14,
+    fontWeight: '600',
     textAlign: 'center',
-    maxWidth: 200,
   },
 });
