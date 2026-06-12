@@ -9,7 +9,7 @@ import { Colors } from './src/theme/colors';
 export default function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
-      <StatusBar style="light" backgroundColor={Colors.background} />
+      <StatusBar style="light" backgroundColor={Colors.bg0} />
       <AppNavigator />
     </GestureHandlerRootView>
   );
@@ -18,6 +18,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.bg0,
   },
 });

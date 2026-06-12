@@ -1,418 +1,290 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  SafeAreaView,
-  TouchableOpacity,
-  Modal,
-  TextInput,
-  Animated,
-  Alert,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, StatusBar,
+  TextInput, Modal, TouchableOpacity, Dimensions, Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle, useSharedValue, withSpring, withTiming,
+  withSequence, FadeIn, FadeInDown, interpolateColor, runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import { Colors } from '../theme/colors';
-import { useStore, Product } from '../store/useStore';
-import { ProductButton } from '../components/ProductButton';
-import { RadialMenu } from '../components/RadialMenu';
-import { formatCurrency } from '../utils/calculations';
+import { Ionicons } from '@expo/vector-icons';
+import { useStore } from '../store/useStore';
+import { Colors, R, F, S } from '../theme/colors';
 
-type Props = { navigation: any };
+const { width: W } = Dimensions.get('window');
+const TILE_W = (W - 48 - 10) / 2;
 
-export default function QuickTapScreen({ navigation }: Props) {
-  const currentStand = useStore((s) => s.currentStand);
-  const registerSale = useStore((s) => s.registerSale);
-  const registerComboSale = useStore((s) => s.registerComboSale);
+// —— Product tile ——
+function ProductTile({ product, onSale, onLongPress }: { product: any; onSale: (p: any) => void; onLongPress: (p: any) => void }) {
+  const flash = useSharedValue(0);
+  const scale = useSharedValue(1);
 
-  const [radialVisible, setRadialVisible] = useState(false);
-  const [radialProduct, setRadialProduct] = useState<Product | null>(null);
-  const [radialX, setRadialX] = useState(0);
-  const [radialY, setRadialY] = useState(0);
+  const triggerSale = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    flash.value = withSequence(withTiming(1, { duration: 60 }), withTiming(0, { duration: 300 }));
+    onSale(product);
+  }, [product]);
 
-  const [comboMode, setComboMode] = useState(false);
-  const [comboItems, setComboItems] = useState<Array<{ product: Product; quantity: number }>>([]);
-  const [comboPrice, setComboPrice] = useState('');
-  const [showComboModal, setShowComboModal] = useState(false);
+  const triggerLong = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    onLongPress(product);
+  }, [product]);
 
-  const flashAnim = useRef(new Animated.Value(0)).current;
-  const [flashText, setFlashText] = useState('');
+  const gesture = Gesture.Simultaneous(
+    Gesture.LongPress().minDuration(350)
+      .onStart(() => { runOnJS(triggerLong)(); }),
+    Gesture.Tap()
+      .onBegin(() => { scale.value = withSpring(0.93, { damping: 14, stiffness: 500 }); })
+      .onFinalize((_, ok) => {
+        scale.value = withSpring(1, { damping: 12, stiffness: 300 });
+        if (ok) runOnJS(triggerSale)();
+      })
+  );
 
-  const products = currentStand?.products ?? [];
+  const tileStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    backgroundColor: interpolateColor(flash.value, [0, 1], [Colors.bg2, Colors.primaryMid]),
+  }));
 
-  const showFlash = (msg: string) => {
-    setFlashText(msg);
-    Animated.sequence([
-      Animated.timing(flashAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-      Animated.delay(800),
-      Animated.timing(flashAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-    ]).start();
-  };
-
-  const handleProductPress = (product: Product) => {
-    if (product.stock === 0) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return;
-    }
-    if (comboMode) {
-      toggleComboItem(product);
-      return;
-    }
-    registerSale({
-      productId: product.id,
-      productName: product.name,
-      quantity: 1,
-      originalPrice: product.price,
-      salePrice: product.price,
-      discount: 0,
-      costPrice: product.costPrice,
-      isCombo: false,
-    });
-    showFlash(`${product.emoji} ${product.name} — ${formatCurrency(product.price)}`);
-  };
-
-  const handleProductLongPress = (product: Product, pageX: number, pageY: number) => {
-    if (product.stock === 0) return;
-    setRadialProduct(product);
-    setRadialX(pageX);
-    setRadialY(pageY);
-    setRadialVisible(true);
-  };
-
-  const handleRadialSelect = (option: string, customPrice?: number) => {
-    if (!radialProduct) return;
-    let salePrice = radialProduct.price;
-    let discount = 0;
-
-    if (option === 'discount_10') {
-      discount = 10;
-      salePrice = radialProduct.price * 0.9;
-    } else if (option === 'discount_20') {
-      discount = 20;
-      salePrice = radialProduct.price * 0.8;
-    } else if (option === 'custom' && customPrice != null) {
-      salePrice = customPrice;
-      discount = Math.round(((radialProduct.price - customPrice) / radialProduct.price) * 100);
-    }
-
-    registerSale({
-      productId: radialProduct.id,
-      productName: radialProduct.name,
-      quantity: 1,
-      originalPrice: radialProduct.price,
-      salePrice,
-      discount,
-      costPrice: radialProduct.costPrice,
-      isCombo: false,
-    });
-    showFlash(
-      `${radialProduct.emoji} ${radialProduct.name}${discount > 0 ? ` (-${discount}%)` : ''} — ${formatCurrency(salePrice)}`
-    );
-  };
-
-  const toggleComboItem = (product: Product) => {
-    setComboItems((prev) => {
-      const existing = prev.find((i) => i.product.id === product.id);
-      if (existing) {
-        return prev.filter((i) => i.product.id !== product.id);
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-  };
-
-  const isInCombo = (product: Product) => comboItems.some((i) => i.product.id === product.id);
-
-  const handleAddToCombo = (product: Product) => {
-    setComboMode(true);
-    toggleComboItem(product);
-  };
-
-  const handleConfirmCombo = () => {
-    const price = parseFloat(comboPrice.replace(',', '.'));
-    if (isNaN(price) || price <= 0) {
-      Alert.alert('Error', 'Ingresa un precio válido para el combo.');
-      return;
-    }
-    if (comboItems.length < 2) {
-      Alert.alert('Error', 'Un combo necesita al menos 2 productos.');
-      return;
-    }
-    registerComboSale(comboItems, price);
-    showFlash(`Combo x${comboItems.length} — ${formatCurrency(price)}`);
-    setComboMode(false);
-    setComboItems([]);
-    setComboPrice('');
-    setShowComboModal(false);
-  };
-
-  const cancelCombo = () => {
-    setComboMode(false);
-    setComboItems([]);
-    setComboPrice('');
-  };
-
-  const comboTotal = comboItems.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  const outOfStock = (product.stock ?? 0) === 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Registrar Venta</Text>
-        {comboMode ? (
-          <TouchableOpacity onPress={cancelCombo}>
-            <Text style={styles.cancelComboText}>Cancelar</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 60 }} />
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[styles.tile, tileStyle, outOfStock && styles.tileOOS]}>
+        <Text style={styles.tileEmoji}>{product.emoji ?? '🛍️'}</Text>
+        <Text style={styles.tileName} numberOfLines={2}>{product.name}</Text>
+        <Text style={styles.tilePrice}>€{(product.price ?? 0).toFixed(2)}</Text>
+        {product.stock !== undefined && (
+          <View style={[styles.stockPill, { backgroundColor: outOfStock ? Colors.redSoft : Colors.greenSoft }]}>
+            <Text style={[styles.stockText, { color: outOfStock ? Colors.red : Colors.green }]}>
+              {outOfStock ? 'Agotado' : `${product.stock} uds`}
+            </Text>
+          </View>
         )}
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+// —— Radial discount sheet ——
+function DiscountSheet({ product, visible, onClose, onApply }: { product: any; visible: boolean; onClose: () => void; onApply: (price: number, desc: string) => void }) {
+  const [customPrice, setCustomPrice] = useState('');
+  if (!product) return null;
+
+  const opts = [
+    { label: '-10%', price: product.price * 0.9, color: Colors.orange },
+    { label: '-20%', price: product.price * 0.8, color: Colors.red },
+    { label: '-30%', price: product.price * 0.7, color: Colors.red },
+    { label: 'Gratis', price: 0, color: Colors.label3 },
+  ];
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.sheetScrim} activeOpacity={1} onPress={onClose}>
+        <Animated.View entering={FadeInDown.duration(280).springify()} style={styles.sheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetProduct}>{product.emoji} {product.name}</Text>
+          <Text style={styles.sheetFull}>Precio normal: €{product.price?.toFixed(2)}</Text>
+
+          <View style={styles.discountGrid}>
+            {opts.map((o) => (
+              <TouchableOpacity key={o.label} style={[styles.discountBtn, { borderColor: o.color + '40' }]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onApply(o.price, o.label); onClose(); }}>
+                <Text style={[styles.discountLabel, { color: o.color }]}>{o.label}</Text>
+                <Text style={styles.discountPrice}>€{o.price.toFixed(2)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.customRow}>
+            <View style={styles.customInput}>
+              <Text style={styles.customPrefix}>€</Text>
+              <TextInput
+                style={styles.customField}
+                placeholder="Precio personalizado"
+                placeholderTextColor={Colors.label4}
+                keyboardType="decimal-pad"
+                value={customPrice}
+                onChangeText={setCustomPrice}
+              />
+            </View>
+            <TouchableOpacity style={styles.customApply}
+              onPress={() => {
+                const p = parseFloat(customPrice);
+                if (!isNaN(p) && p >= 0) { onApply(p, `€${p.toFixed(2)}`); onClose(); }
+              }}>
+              <Text style={styles.customApplyLabel}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+// —— Main screen ——
+export default function QuickTapScreen({ navigation }: { navigation: any }) {
+  const currentStand = useStore((s) => s.currentStand);
+  const registerSale = useStore((s) => s.registerSale);
+  const activeCashier = useStore((s) => s.activeCashier);
+
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [lastSale, setLastSale] = useState<string | null>(null);
+  const lastSaleAnim = useSharedValue(0);
+
+  const products = (currentStand?.products ?? []).filter((p: any) => p.isActive !== false && p.is_active !== 0);
+
+  const doSale = useCallback(async (product: any, salePrice?: number, discountDesc?: string) => {
+    const price = salePrice ?? product.price;
+    try {
+      await registerSale({
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        originalPrice: product.price,
+        salePrice: price,
+        discount: product.price - price,
+        costPrice: product.costPrice ?? product.cost_price ?? 0,
+        isCombo: false,
+      });
+      const label = discountDesc ? `${product.name} (${discountDesc})` : product.name;
+      setLastSale(`✅ ${label} — €${price.toFixed(2)}`);
+      lastSaleAnim.value = withSequence(
+        withTiming(1, { duration: 200 }),
+        withTiming(1, { duration: 1800 }),
+        withTiming(0, { duration: 400 })
+      );
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  }, [registerSale]);
+
+  const toastStyle = useAnimatedStyle(() => ({
+    opacity: lastSaleAnim.value,
+    transform: [{ translateY: withTiming(lastSaleAnim.value === 0 ? 20 : 0, { duration: 200 }) }],
+  }));
+
+  if (!currentStand) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.emptyCenter}>
+          <Text style={styles.emptyIcon}>🏪</Text>
+          <Text style={styles.emptyMsg}>Configura tu puesto primero</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bg0} />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10}>
+          <Ionicons name="chevron-back" size={24} color={Colors.label2} />
+        </TouchableOpacity>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={styles.headerTitle}>Registro rápido</Text>
+          {activeCashier && <Text style={styles.headerSub}>🙋 {activeCashier.name}</Text>}
+        </View>
+        <View style={{ width: 24 }} />
       </View>
 
-      {comboMode && (
-        <View style={styles.comboBanner}>
-          <Text style={styles.comboBannerText}>
-            Modo Combo — {comboItems.length} producto{comboItems.length !== 1 ? 's' : ''} seleccionado{comboItems.length !== 1 ? 's' : ''}
-          </Text>
-          {comboItems.length >= 2 && (
-            <TouchableOpacity
-              style={styles.comboProceed}
-              onPress={() => setShowComboModal(true)}
-            >
-              <Text style={styles.comboProceedText}>Fijar precio</Text>
-              <Ionicons name="chevron-forward" size={14} color={Colors.text} />
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      <Animated.View
-        style={[styles.flashOverlay, { opacity: flashAnim }]}
-        pointerEvents="none"
-      >
-        <View style={styles.flashCard}>
-          <Ionicons name="checkmark-circle" size={22} color={Colors.accent} />
-          <Text style={styles.flashText}>{flashText}</Text>
-        </View>
+      {/* Toast */}
+      <Animated.View style={[styles.toast, toastStyle]} pointerEvents="none">
+        <Text style={styles.toastText}>{lastSale}</Text>
       </Animated.View>
 
-      {products.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyText}>No hay productos configurados</Text>
-          <TouchableOpacity
-            style={styles.setupButton}
-            onPress={() => navigation.navigate('StandSetup')}
-          >
-            <Text style={styles.setupButtonText}>Agregar Productos</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.grid}
-          renderItem={({ item }) => (
-            <ProductButton
-              product={item}
-              onPress={handleProductPress}
-              onLongPress={handleProductLongPress}
-              inCombo={isInCombo(item)}
-            />
-          )}
-        />
-      )}
-
-      <RadialMenu
-        visible={radialVisible}
-        product={radialProduct}
-        anchorX={radialX}
-        anchorY={radialY}
-        onSelect={handleRadialSelect}
-        onClose={() => setRadialVisible(false)}
-        onAddToCombo={handleAddToCombo}
-      />
-
-      <Modal visible={showComboModal} transparent animationType="slide">
-        <View style={styles.comboModalOverlay}>
-          <View style={styles.comboModal}>
-            <Text style={styles.comboModalTitle}>Precio del Combo</Text>
-            <View style={styles.comboItemsList}>
-              {comboItems.map((item) => (
-                <View key={item.product.id} style={styles.comboItemRow}>
-                  <Text style={styles.comboItemEmoji}>{item.product.emoji}</Text>
-                  <Text style={styles.comboItemName}>{item.product.name}</Text>
-                  <Text style={styles.comboItemPrice}>{formatCurrency(item.product.price)}</Text>
-                </View>
-              ))}
-              <View style={styles.comboTotal}>
-                <Text style={styles.comboTotalLabel}>Total original</Text>
-                <Text style={styles.comboTotalValue}>{formatCurrency(comboTotal)}</Text>
-              </View>
-            </View>
-            <Text style={styles.comboInputLabel}>Precio del bundle $</Text>
-            <TextInput
-              style={styles.comboInput}
-              value={comboPrice}
-              onChangeText={setComboPrice}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-              placeholderTextColor={Colors.subtext}
-              autoFocus
-            />
-            <View style={styles.comboActions}>
-              <TouchableOpacity
-                style={styles.comboCancelBtn}
-                onPress={() => setShowComboModal(false)}
-              >
-                <Text style={styles.comboCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.comboConfirmBtn} onPress={handleConfirmCombo}>
-                <Ionicons name="checkmark" size={18} color={Colors.background} />
-                <Text style={styles.comboConfirmText}>Registrar Combo</Text>
-              </TouchableOpacity>
-            </View>
+      <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
+        {products.length === 0 ? (
+          <View style={styles.emptyCenter}>
+            <Text style={styles.emptyIcon}>📦</Text>
+            <Text style={styles.emptyMsg}>Sin productos. Añade desde Ajustes.</Text>
           </View>
-        </View>
-      </Modal>
+        ) : (
+          products.map((product: any) => (
+            <ProductTile
+              key={product.id}
+              product={product}
+              onSale={(p) => doSale(p)}
+              onLongPress={(p) => { setSelectedProduct(p); setSheetVisible(true); }}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      <DiscountSheet
+        product={selectedProduct}
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        onApply={(price, desc) => selectedProduct && doSale(selectedProduct, price, desc)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: Colors.bg0 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: S.xl, paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.sep,
   },
-  headerTitle: { color: Colors.text, fontSize: 17, fontWeight: '700' },
-  cancelComboText: { color: Colors.danger, fontSize: 14, fontWeight: '600' },
-  comboBanner: {
-    backgroundColor: Colors.primary + '22',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primary + '44',
+  headerTitle: { fontSize: F.headline, fontWeight: F.bold, color: Colors.label1 },
+  headerSub: { fontSize: F.caption, color: Colors.label3, marginTop: 1 },
+
+  toast: {
+    position: 'absolute', top: 90, left: 20, right: 20, zIndex: 99,
+    backgroundColor: Colors.bg3, borderRadius: R.md, padding: 14,
+    borderWidth: 1, borderColor: Colors.green + '40',
+    shadowColor: Colors.green, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12,
   },
-  comboBannerText: { color: Colors.primary, fontSize: 13, fontWeight: '600' },
-  comboProceed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  toastText: { fontSize: F.sub, fontWeight: F.medium, color: Colors.green, textAlign: 'center' },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 14, gap: 10 },
+
+  tile: {
+    width: TILE_W, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep,
+    padding: 16, alignItems: 'center', minHeight: 140, justifyContent: 'center', gap: 6,
   },
-  comboProceedText: { color: Colors.text, fontSize: 12, fontWeight: '700' },
-  flashOverlay: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    alignItems: 'center',
+  tileOOS: { opacity: 0.45 },
+  tileEmoji: { fontSize: 36 },
+  tileName: { fontSize: F.sub, fontWeight: F.semibold, color: Colors.label1, textAlign: 'center' },
+  tilePrice: { fontSize: F.body, fontWeight: F.bold, color: Colors.primary },
+  stockPill: { borderRadius: R.full, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
+  stockText: { fontSize: F.micro, fontWeight: F.semibold },
+
+  sheetScrim: { flex: 1, backgroundColor: Colors.scrim, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: Colors.bg2, borderTopLeftRadius: R.xl, borderTopRightRadius: R.xl,
+    borderWidth: 1, borderColor: Colors.sep, padding: 24, paddingBottom: 40,
   },
-  flashCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + '55',
+  sheetHandle: { width: 36, height: 4, backgroundColor: Colors.sep, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  sheetProduct: { fontSize: F.title3, fontWeight: F.bold, color: Colors.label1, marginBottom: 4 },
+  sheetFull: { fontSize: F.footnote, color: Colors.label3, marginBottom: 20 },
+  discountGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  discountBtn: {
+    flex: 1, minWidth: '44%', backgroundColor: Colors.bg3, borderRadius: R.md,
+    borderWidth: 1, padding: 14, alignItems: 'center', gap: 4,
   },
-  flashText: { color: Colors.text, fontSize: 14, fontWeight: '600' },
-  grid: { padding: 8 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyIcon: { fontSize: 56 },
-  emptyText: { color: Colors.text, fontSize: 18, fontWeight: '700' },
-  setupButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  discountLabel: { fontSize: F.headline, fontWeight: F.bold },
+  discountPrice: { fontSize: F.footnote, color: Colors.label3 },
+  customRow: { flexDirection: 'row', gap: 10 },
+  customInput: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.bg3, borderRadius: R.md, borderWidth: 1, borderColor: Colors.sep,
+    paddingHorizontal: 14,
   },
-  setupButtonText: { color: Colors.text, fontSize: 15, fontWeight: '700' },
-  comboModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-  },
-  comboModal: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  comboModalTitle: { color: Colors.text, fontSize: 20, fontWeight: '800', marginBottom: 16 },
-  comboItemsList: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    gap: 8,
-  },
-  comboItemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  comboItemEmoji: { fontSize: 20 },
-  comboItemName: { color: Colors.text, fontSize: 14, flex: 1 },
-  comboItemPrice: { color: Colors.subtext, fontSize: 13 },
-  comboTotal: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  comboTotalLabel: { color: Colors.subtext, fontSize: 13 },
-  comboTotalValue: { color: Colors.text, fontSize: 14, fontWeight: '700' },
-  comboInputLabel: { color: Colors.subtext, fontSize: 13, marginBottom: 8, fontWeight: '500' },
-  comboInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    color: Colors.text,
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    marginBottom: 16,
-  },
-  comboActions: { flexDirection: 'row', gap: 12 },
-  comboCancelBtn: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignItems: 'center',
-  },
-  comboCancelText: { color: Colors.subtext, fontWeight: '600' },
-  comboConfirmBtn: {
-    flex: 2,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  comboConfirmText: { color: Colors.background, fontWeight: '800', fontSize: 15 },
+  customPrefix: { fontSize: F.body, color: Colors.label3, marginRight: 4 },
+  customField: { flex: 1, color: Colors.label1, fontSize: F.body, paddingVertical: 12 },
+  customApply: { backgroundColor: Colors.primary, borderRadius: R.md, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center' },
+  customApplyLabel: { fontSize: F.body, fontWeight: F.bold, color: '#fff' },
+
+  emptyCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12, minHeight: 300 },
+  emptyIcon: { fontSize: 48 },
+  emptyMsg: { fontSize: F.body, color: Colors.label3, textAlign: 'center' },
 });

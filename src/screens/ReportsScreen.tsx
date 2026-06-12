@@ -1,273 +1,205 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  Alert,
+  View, Text, StyleSheet, ScrollView, SafeAreaView, StatusBar,
+  TouchableOpacity, Share, Alert, ActivityIndicator,
 } from 'react-native';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme/colors';
 import { useStore } from '../store/useStore';
-import { TransactionItem } from '../components/TransactionItem';
-import { StatCard } from '../components/StatCard';
-import {
-  calculateGrossRevenue,
-  calculateNetRevenue,
-  calculateTotalCOGS,
-  calculateNetProfit,
-  getBestSeller,
-  getSalesByProduct,
-  formatCurrency,
-} from '../utils/calculations';
-import { exportCSV } from '../utils/exportUtils';
+import { Colors, R, F, S } from '../theme/colors';
 
-type Props = { navigation: any };
+interface BarProps { label: string; value: number; max: number; color: string; }
+function Bar({ label, value, max, color }: BarProps) {
+  const anim = useSharedValue(0);
+  useEffect(() => { anim.value = withSpring(max > 0 ? value / max : 0, { damping: 18, stiffness: 80 }); }, [value, max]);
+  const barStyle = useAnimatedStyle(() => ({ width: `${anim.value * 100}%` }));
+  return (
+    <View style={barStyles.row}>
+      <Text style={barStyles.label} numberOfLines={1}>{label}</Text>
+      <View style={barStyles.track}>
+        <Animated.View style={[barStyles.fill, { backgroundColor: color }, barStyle]} />
+      </View>
+      <Text style={barStyles.value}>€{value.toFixed(0)}</Text>
+    </View>
+  );
+}
+const barStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  label: { width: 80, fontSize: F.caption, color: Colors.label3, fontWeight: F.medium },
+  track: { flex: 1, height: 6, backgroundColor: Colors.bg4, borderRadius: R.full, overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: R.full },
+  value: { width: 50, fontSize: F.caption, color: Colors.label2, fontWeight: F.semibold, textAlign: 'right' },
+});
 
-export default function ReportsScreen({ navigation }: Props) {
+export default function ReportsScreen({ navigation }: { navigation: any }) {
   const currentStand = useStore((s) => s.currentStand);
   const currentEvent = useStore((s) => s.currentEvent);
-  const [exporting, setExporting] = useState(false);
 
+  if (!currentStand) return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.center}><Text style={styles.emptyMsg}>Sin datos</Text></View>
+    </SafeAreaView>
+  );
+
+  const txs = (currentStand.transactions ?? []);
   const commissionRate = currentEvent?.commissionRate ?? 0;
+  const breakEven = (currentStand.standCost ?? 0) + (currentStand.inventoryCost ?? 0);
+  const grossRevenue = txs.reduce((s, t) => s + t.salePrice * (t.quantity ?? 1), 0);
+  const netRevenue = grossRevenue * (1 - commissionRate);
+  const totalCost = txs.reduce((s, t) => s + t.costPrice * (t.quantity ?? 1), 0);
+  const totalDiscount = txs.reduce((s, t) => s + (t.discount ?? 0), 0);
+  const netProfit = netRevenue - totalCost - breakEven;
+  const txCount = txs.length;
 
-  const stats = useMemo(() => {
-    if (!currentStand) return null;
-    const txs = currentStand.transactions;
-    const gross = calculateGrossRevenue(txs);
-    const net = calculateNetRevenue(gross, commissionRate);
-    const cogs = calculateTotalCOGS(txs);
-    const profit = calculateNetProfit(net, cogs);
-    const salesByProduct = getSalesByProduct(txs);
-    const bestSeller = getBestSeller(txs);
-    return { gross, net, cogs, profit, salesByProduct, bestSeller, txCount: txs.length };
-  }, [currentStand, commissionRate]);
+  // Per-product stats
+  const byProduct: Record<string, { revenue: number; count: number; emoji: string }> = {};
+  for (const t of txs) {
+    const k = t.productName;
+    if (!byProduct[k]) byProduct[k] = { revenue: 0, count: 0, emoji: '🛍️' };
+    byProduct[k].revenue += t.salePrice * (t.quantity ?? 1);
+    byProduct[k].count += 1;
+  }
+  const productList = Object.entries(byProduct).sort((a, b) => b[1].revenue - a[1].revenue);
+  const maxRevenue = productList[0]?.[1]?.revenue ?? 1;
 
-  const productSales = useMemo(() => {
-    if (!stats) return [];
-    return Object.entries(stats.salesByProduct)
-      .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => b.total - a.total);
-  }, [stats]);
-
-  const maxProductTotal = productSales.length > 0 ? productSales[0].total : 1;
-
-  const handleExportCSV = async () => {
-    if (!currentStand) return;
-    setExporting(true);
-    try {
-      await exportCSV(currentStand, commissionRate);
-    } catch (e) {
-      Alert.alert('Error', 'No se pudo exportar el reporte. Intenta de nuevo.');
-    } finally {
-      setExporting(false);
-    }
+  const exportCSV = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const header = 'Fecha,Hora,Producto,Precio Original,Precio Venta,Descuento,Coste,Margen\n';
+    const rows = txs.map(t => {
+      const d = new Date(t.timestamp);
+      return [
+        d.toLocaleDateString('es-ES'),
+        d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        `"${t.productName}"`,
+        t.originalPrice?.toFixed(2) ?? t.salePrice.toFixed(2),
+        t.salePrice.toFixed(2),
+        (t.discount ?? 0).toFixed(2),
+        t.costPrice.toFixed(2),
+        t.netMargin?.toFixed(2) ?? '0.00',
+      ].join(',');
+    }).join('\n');
+    Share.share({ message: header + rows, title: `Reporte - ${currentStand.name}` });
   };
 
-  if (!currentStand || !stats) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📊</Text>
-          <Text style={styles.emptyText}>No hay datos disponibles</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const palette = [Colors.primary, Colors.blue, Colors.green, Colors.orange, Colors.teal];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bg0} />
+
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10}>
+          <Ionicons name="chevron-back" size={24} color={Colors.label2} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Reportes</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={exportCSV} style={styles.exportBtn}>
+          <Ionicons name="download-outline" size={18} color={Colors.primary} />
+          <Text style={styles.exportLabel}>CSV</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Summary Cards */}
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Ventas Brutas"
-            value={formatCurrency(stats.gross)}
-            icon="cash-outline"
-            color={Colors.primary}
-          />
-          <StatCard
-            title="Ventas Netas"
-            value={formatCurrency(stats.net)}
-            icon="wallet-outline"
-            color={Colors.info}
-            subtitle={commissionRate > 0 ? `Comisión: ${formatCurrency(stats.gross * commissionRate)}` : undefined}
-          />
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* KPI row */}
+        <View style={styles.kpiRow}>
+          {[
+            { label: 'Ingresos brutos', value: `€${grossRevenue.toFixed(2)}`, color: Colors.label1, icon: '💰' },
+            { label: 'Ingresos netos', value: `€${netRevenue.toFixed(2)}`, color: Colors.blue, icon: '✅' },
+            { label: 'Beneficio neto', value: `${netProfit >= 0 ? '+' : ''}€${netProfit.toFixed(2)}`, color: netProfit >= 0 ? Colors.green : Colors.red, icon: netProfit >= 0 ? '📈' : '📉' },
+          ].map((kpi, i) => (
+            <Animated.View key={kpi.label} entering={FadeInDown.delay(i * 60).duration(400).springify()} style={styles.kpiCard}>
+              <Text style={{ fontSize: 22 }}>{kpi.icon}</Text>
+              <Text style={[styles.kpiValue, { color: kpi.color }]}>{kpi.value}</Text>
+              <Text style={styles.kpiLabel}>{kpi.label}</Text>
+            </Animated.View>
+          ))}
         </View>
 
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Costo de Mercancía"
-            value={formatCurrency(stats.cogs)}
-            icon="cube-outline"
-            color={Colors.warning}
-          />
-          <StatCard
-            title="Ganancia Neta"
-            value={formatCurrency(stats.profit)}
-            icon={stats.profit >= 0 ? 'trending-up-outline' : 'trending-down-outline'}
-            color={stats.profit >= 0 ? Colors.accent : Colors.danger}
-          />
-        </View>
+        {/* Secondary metrics */}
+        <Animated.View entering={FadeInDown.delay(180).duration(400)} style={styles.metaCard}>
+          <MetaRow icon="receipt-outline" label="Total ventas" value={`${txCount}`} />
+          <View style={styles.metaSep} />
+          <MetaRow icon="ticket-outline" label="Ticket medio" value={txCount > 0 ? `€${(grossRevenue / txCount).toFixed(2)}` : '—'} />
+          <View style={styles.metaSep} />
+          <MetaRow icon="pricetag-outline" label="Total descuentos" value={`€${totalDiscount.toFixed(2)}`} color={Colors.orange} />
+          <View style={styles.metaSep} />
+          <MetaRow icon="storefront-outline" label="Comisión festival" value={`€${(grossRevenue * commissionRate).toFixed(2)}`} color={Colors.red} />
+        </Animated.View>
 
-        <View style={styles.row2}>
-          <View style={styles.smallCard}>
-            <Ionicons name="receipt-outline" size={18} color={Colors.subtext} />
-            <Text style={styles.smallCardValue}>{stats.txCount}</Text>
-            <Text style={styles.smallCardLabel}>Transacciones</Text>
-          </View>
-          <View style={[styles.smallCard, { flex: 2 }]}>
-            <Ionicons name="star-outline" size={18} color={Colors.warning} />
-            <Text style={styles.smallCardValue} numberOfLines={1}>{stats.bestSeller}</Text>
-            <Text style={styles.smallCardLabel}>Más Vendido</Text>
-          </View>
-        </View>
-
-        {/* Bar Chart */}
-        {productSales.length > 0 && (
-          <View style={styles.chartCard}>
-            <Text style={styles.chartTitle}>Ventas por Producto</Text>
-            {productSales.map((item) => (
-              <View key={item.id} style={styles.barRow}>
-                <Text style={styles.barLabel} numberOfLines={1}>{item.name}</Text>
-                <View style={styles.barTrack}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      { width: `${(item.total / maxProductTotal) * 100}%` },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.barValue}>{formatCurrency(item.total)}</Text>
-              </View>
+        {/* Revenue by product */}
+        {productList.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(240).duration(400)} style={styles.chartCard}>
+            <Text style={styles.sectionTitle}>Ingresos por producto</Text>
+            {productList.slice(0, 8).map(([name, data], i) => (
+              <Bar key={name} label={name} value={data.revenue} max={maxRevenue} color={palette[i % palette.length]} />
             ))}
-          </View>
+          </Animated.View>
         )}
 
-        {/* Export Buttons */}
-        <View style={styles.exportRow}>
-          <TouchableOpacity
-            style={[styles.exportButton, exporting && styles.disabledButton]}
-            onPress={handleExportCSV}
-            disabled={exporting}
-          >
-            <Ionicons name="document-text-outline" size={18} color={Colors.accent} />
-            <Text style={styles.exportButtonText}>
-              {exporting ? 'Exportando...' : 'Exportar CSV'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Transaction History */}
-        <Text style={styles.sectionTitle}>Historial de Transacciones ({stats.txCount})</Text>
-        {currentStand.transactions.length === 0 ? (
-          <View style={styles.noTx}>
-            <Text style={styles.noTxText}>Sin transacciones registradas</Text>
-          </View>
-        ) : (
-          <View style={styles.txList}>
-            {currentStand.transactions.map((t) => (
-              <TransactionItem key={t.id} transaction={t} />
+        {/* Transaction list */}
+        {txs.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.txCard}>
+            <Text style={styles.sectionTitle}>Historial completo</Text>
+            {[...txs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((tx, i) => (
+              <View key={tx.id} style={[styles.txRow, i < txs.length - 1 && styles.txBorder]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.txName}>{tx.productName}</Text>
+                  <Text style={styles.txTime}>{new Date(tx.timestamp).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  {(tx.discount ?? 0) > 0 && <Text style={styles.txDiscount}>-€{(tx.discount ?? 0).toFixed(2)}</Text>}
+                  <Text style={styles.txPrice}>€{tx.salePrice.toFixed(2)}</Text>
+                </View>
+              </View>
             ))}
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function MetaRow({ icon, label, value, color = Colors.label1 }: { icon: any; label: string; value: string; color?: string }) {
+  return (
+    <View style={styles.metaRow}>
+      <Ionicons name={icon} size={16} color={Colors.label3} />
+      <Text style={styles.metaLabel}>{label}</Text>
+      <Text style={[styles.metaValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerTitle: { color: Colors.text, fontSize: 17, fontWeight: '700' },
-  scrollContent: { padding: 14, gap: 12 },
-  statsRow: { flexDirection: 'row', gap: 0 },
-  row2: { flexDirection: 'row', gap: 8 },
-  smallCard: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-  },
-  smallCardValue: { color: Colors.text, fontSize: 16, fontWeight: '800', textAlign: 'center' },
-  smallCardLabel: { color: Colors.subtext, fontSize: 11, textAlign: 'center' },
-  chartCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 12,
-  },
-  chartTitle: { color: Colors.text, fontSize: 16, fontWeight: '700', marginBottom: 4 },
-  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  barLabel: { color: Colors.subtext, fontSize: 12, width: 90 },
-  barTrack: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.background,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 4,
-  },
-  barValue: { color: Colors.text, fontSize: 12, fontWeight: '600', width: 60, textAlign: 'right' },
-  exportRow: { gap: 8 },
-  exportButton: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.accent + '55',
-  },
-  disabledButton: { opacity: 0.5 },
-  exportButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '700' },
-  sectionTitle: {
-    color: Colors.subtext,
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  txList: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  noTx: { alignItems: 'center', paddingVertical: 20 },
-  noTxText: { color: Colors.subtext, fontSize: 14 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyIcon: { fontSize: 56 },
-  emptyText: { color: Colors.text, fontSize: 18, fontWeight: '700' },
+  safe: { flex: 1, backgroundColor: Colors.bg0 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyMsg: { fontSize: F.body, color: Colors.label3 },
+  scroll: { padding: S.xl, paddingBottom: 48 },
+
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: S.xl, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.sep },
+  headerTitle: { fontSize: F.headline, fontWeight: F.bold, color: Colors.label1 },
+  exportBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primarySoft, borderRadius: R.full, paddingHorizontal: 12, paddingVertical: 6 },
+  exportLabel: { fontSize: F.caption, fontWeight: F.bold, color: Colors.primary },
+
+  kpiRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  kpiCard: { flex: 1, backgroundColor: Colors.bg2, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep, padding: 14, alignItems: 'center', gap: 4 },
+  kpiValue: { fontSize: F.sub, fontWeight: F.bold, letterSpacing: -0.2 },
+  kpiLabel: { fontSize: F.micro, color: Colors.label4, textAlign: 'center' },
+
+  metaCard: { backgroundColor: Colors.bg2, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep, overflow: 'hidden', marginBottom: 12 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
+  metaLabel: { flex: 1, fontSize: F.sub, color: Colors.label2 },
+  metaValue: { fontSize: F.sub, fontWeight: F.semibold },
+  metaSep: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.sep },
+
+  chartCard: { backgroundColor: Colors.bg2, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep, padding: 18, marginBottom: 12 },
+  sectionTitle: { fontSize: F.caption, fontWeight: F.semibold, color: Colors.label3, marginBottom: 14, letterSpacing: 0.5, textTransform: 'uppercase' },
+
+  txCard: { backgroundColor: Colors.bg2, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep, overflow: 'hidden' },
+  txRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
+  txBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.sep },
+  txName: { fontSize: F.sub, fontWeight: F.medium, color: Colors.label1 },
+  txTime: { fontSize: F.caption, color: Colors.label4, marginTop: 1 },
+  txDiscount: { fontSize: F.micro, color: Colors.orange },
+  txPrice: { fontSize: F.body, fontWeight: F.semibold, color: Colors.label1 },
 });

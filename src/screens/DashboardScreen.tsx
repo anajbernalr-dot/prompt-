@@ -1,310 +1,205 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  RefreshControl,
+  View, Text, StyleSheet, ScrollView, SafeAreaView,
+  StatusBar, RefreshControl, TouchableOpacity,
 } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme/colors';
 import { useStore } from '../store/useStore';
-import { BreakEvenBar } from '../components/BreakEvenBar';
-import { StatCard } from '../components/StatCard';
-import { TransactionItem } from '../components/TransactionItem';
-import {
-  calculateGrossRevenue,
-  calculateNetRevenue,
-  calculateTotalCOGS,
-  calculateNetProfit,
-  calculateBreakEvenProgress,
-  getBestSeller,
-  formatCurrency,
-} from '../utils/calculations';
+import BreakEvenBar from '../components/BreakEvenBar';
+import { Colors, R, F, S } from '../theme/colors';
 
-type Props = { navigation: any };
+interface MetricTileProps {
+  label: string;
+  value: string;
+  sub?: string;
+  color?: string;
+  icon: string;
+  delay?: number;
+}
 
-export default function DashboardScreen({ navigation }: Props) {
+function MetricTile({ label, value, sub, color = Colors.label1, icon, delay = 0 }: MetricTileProps) {
+  return (
+    <Animated.View entering={FadeInDown.delay(delay).duration(400).springify()} style={styles.tile}>
+      <View style={[styles.tileIcon, { backgroundColor: color + '18' }]}>
+        <Text style={{ fontSize: 18 }}>{icon}</Text>
+      </View>
+      <Text style={[styles.tileValue, { color }]}>{value}</Text>
+      <Text style={styles.tileLabel}>{label}</Text>
+      {sub ? <Text style={styles.tileSub}>{sub}</Text> : null}
+    </Animated.View>
+  );
+}
+
+export default function DashboardScreen({ navigation }: { navigation: any }) {
   const currentStand = useStore((s) => s.currentStand);
   const currentEvent = useStore((s) => s.currentEvent);
-  const userRole = useStore((s) => s.userRole);
+  const refreshStandData = useStore((s) => s.refreshStandData);
+  const [refreshing, setRefreshing] = React.useState(false);
 
-  const commissionRate = currentEvent?.commissionRate ?? 0;
-
-  const stats = useMemo(() => {
-    if (!currentStand) return null;
-    const txs = currentStand.transactions;
-    const gross = calculateGrossRevenue(txs);
-    const net = calculateNetRevenue(gross, commissionRate);
-    const cogs = calculateTotalCOGS(txs);
-    const profit = calculateNetProfit(net, cogs);
-    const progress = calculateBreakEvenProgress(currentStand, commissionRate);
-    return {
-      gross,
-      net,
-      cogs,
-      profit,
-      progress,
-      txCount: txs.length,
-      bestSeller: getBestSeller(txs),
-    };
-  }, [currentStand, commissionRate]);
-
-  const recentTransactions = currentStand?.transactions.slice(0, 10) ?? [];
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshStandData?.();
+    setRefreshing(false);
+  }, []);
 
   if (!currentStand) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🏪</Text>
-          <Text style={styles.emptyText}>No hay puesto configurado</Text>
-          <TouchableOpacity style={styles.setupButton} onPress={() => navigation.navigate('StandSetup')}>
-            <Text style={styles.setupButtonText}>Configurar Puesto</Text>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.empty}>
+          <Text style={{ fontSize: 48 }}>🏪</Text>
+          <Text style={styles.emptyTitle}>Sin puesto activo</Text>
+          <Text style={styles.emptySub}>Únete a un evento o crea el tuyo</Text>
+          <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('Onboarding')}>
+            <Text style={styles.emptyBtnLabel}>Empezar</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
+  const txs = currentStand.transactions ?? [];
+  const commissionRate = currentEvent?.commissionRate ?? 0;
+  const breakEven = (currentStand.standCost ?? 0) + (currentStand.inventoryCost ?? 0);
+
+  const grossRevenue = txs.reduce((s, t) => s + t.salePrice * (t.quantity ?? 1), 0);
+  const netRevenue = grossRevenue * (1 - commissionRate);
+  const totalCost = txs.reduce((s, t) => s + t.costPrice * (t.quantity ?? 1), 0);
+  const netProfit = netRevenue - totalCost - breakEven;
+  const progress = breakEven > 0 ? (netRevenue / breakEven) * 100 : 100;
+  const txCount = txs.length;
+  const avgTicket = txCount > 0 ? grossRevenue / txCount : 0;
+
+  const recentTxs = [...txs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 6);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.storeName}>{currentStand.name}</Text>
-          {currentEvent && (
-            <Text style={styles.eventName}>{currentEvent.name}</Text>
-          )}
-        </View>
-        {userRole === 'organizer' && (
-          <TouchableOpacity
-            style={styles.orgBadge}
-            onPress={() => navigation.navigate('OrganizerDashboard')}
-          >
-            <Ionicons name="grid-outline" size={16} color={Colors.primary} />
-            <Text style={styles.orgBadgeText}>Org.</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bg0} />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={false} tintColor={Colors.primary} />}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       >
-        {stats && (
-          <>
-            <View style={styles.breakEvenSection}>
-              <BreakEvenBar progress={stats.progress} />
-            </View>
-
-            <View style={styles.statsRow}>
-              <StatCard
-                title="Ventas Brutas"
-                value={formatCurrency(stats.gross)}
-                icon="cash-outline"
-                color={Colors.primary}
-              />
-              <StatCard
-                title="Ventas Netas"
-                value={formatCurrency(stats.net)}
-                icon="wallet-outline"
-                color={Colors.info}
-                subtitle={commissionRate > 0 ? `-${(commissionRate * 100).toFixed(0)}% comisión` : undefined}
-              />
-            </View>
-
-            <View style={styles.statsRow}>
-              <StatCard
-                title="Ganancia Neta"
-                value={formatCurrency(stats.profit)}
-                icon={stats.profit >= 0 ? 'trending-up-outline' : 'trending-down-outline'}
-                color={stats.profit >= 0 ? Colors.accent : Colors.danger}
-              />
-              <StatCard
-                title="Transacciones"
-                value={stats.txCount.toString()}
-                icon="receipt-outline"
-                color={Colors.warning}
-              />
-            </View>
-
-            {stats.bestSeller !== '—' && (
-              <View style={styles.bestSellerCard}>
-                <Ionicons name="star-outline" size={16} color={Colors.warning} />
-                <Text style={styles.bestSellerLabel}>Más vendido:</Text>
-                <Text style={styles.bestSellerName}>{stats.bestSeller}</Text>
-              </View>
-            )}
-          </>
-        )}
-
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionButtonPrimary}
-            onPress={() => navigation.navigate('QuickTap')}
-          >
-            <Ionicons name="flash" size={22} color={Colors.text} />
-            <Text style={styles.actionButtonPrimaryText}>Registrar Venta</Text>
-          </TouchableOpacity>
-
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('PanicMode')}
-            >
-              <Ionicons name="warning-outline" size={20} color={Colors.danger} />
-              <Text style={[styles.actionButtonText, { color: Colors.danger }]}>Modo Pánico</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => navigation.navigate('Reports')}
-            >
-              <Ionicons name="bar-chart-outline" size={20} color={Colors.primary} />
-              <Text style={[styles.actionButtonText, { color: Colors.primary }]}>Reportes</Text>
-            </TouchableOpacity>
+        {/* Header */}
+        <Animated.View entering={FadeIn.duration(400)} style={styles.header}>
+          <View>
+            <Text style={styles.headerSuper}>{currentEvent?.name ?? 'Evento'}</Text>
+            <Text style={styles.headerTitle}>{currentStand.name}</Text>
           </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
+            <Ionicons name="settings-outline" size={20} color={Colors.label3} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Break-even card */}
+        <Animated.View entering={FadeInDown.delay(80).duration(400).springify()} style={styles.breakEvenCard}>
+          <BreakEvenBar progress={progress} netRevenue={netRevenue} breakEven={breakEven} netProfit={netProfit} />
+        </Animated.View>
+
+        {/* Metrics grid */}
+        <View style={styles.grid}>
+          <MetricTile icon="💰" label="Ingresos brutos" value={`€${grossRevenue.toFixed(2)}`} color={Colors.label1} delay={100} />
+          <MetricTile icon="✅" label="Ingr. netos" value={`€${netRevenue.toFixed(2)}`} sub={`-${(commissionRate * 100).toFixed(0)}% comisión`} color={Colors.blue} delay={140} />
+          <MetricTile icon={netProfit >= 0 ? '📈' : '📉'} label="Beneficio neto" value={`${netProfit >= 0 ? '+' : ''}€${netProfit.toFixed(2)}`} color={netProfit >= 0 ? Colors.green : Colors.red} delay={180} />
+          <MetricTile icon="🎫" label="Ticket medio" value={`€${avgTicket.toFixed(2)}`} sub={`${txCount} venta${txCount !== 1 ? 's' : ''}`} color={Colors.orange} delay={220} />
         </View>
 
-        {recentTransactions.length > 0 && (
-          <View style={styles.recentSection}>
-            <Text style={styles.sectionTitle}>Últimas Transacciones</Text>
-            <View style={styles.transactionList}>
-              {recentTransactions.map((t) => (
-                <TransactionItem key={t.id} transaction={t} />
-              ))}
-            </View>
-            {currentStand.transactions.length > 10 && (
-              <TouchableOpacity
-                style={styles.viewAllButton}
-                onPress={() => navigation.navigate('Reports')}
-              >
-                <Text style={styles.viewAllText}>Ver todas las transacciones</Text>
-                <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+        {/* Quick actions */}
+        <Animated.View entering={FadeInDown.delay(260).duration(400)} style={styles.actions}>
+          <ActionBtn icon="flash" label="Vender" color={Colors.primary} onPress={() => navigation.navigate('QuickTap')} />
+          <ActionBtn icon="warning" label="Panic" color={Colors.orange} onPress={() => navigation.navigate('PanicMode')} />
+          <ActionBtn icon="bar-chart" label="Reportes" color={Colors.blue} onPress={() => navigation.navigate('Reports')} />
+        </Animated.View>
 
-        {recentTransactions.length === 0 && (
-          <View style={styles.noTransactions}>
-            <Text style={styles.noTxIcon}>💸</Text>
-            <Text style={styles.noTxText}>Sin transacciones aún</Text>
-            <Text style={styles.noTxSubtext}>Registra tu primera venta tocando "Registrar Venta"</Text>
-          </View>
+        {/* Recent transactions */}
+        {recentTxs.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.section}>
+            <Text style={styles.sectionTitle}>Últimas ventas</Text>
+            <View style={styles.txList}>
+              {recentTxs.map((tx, i) => {
+                const disc = tx.discount ?? 0;
+                const margin = tx.netMargin ?? 0;
+                return (
+                  <View key={tx.id} style={[styles.txRow, i < recentTxs.length - 1 && styles.txRowBorder]}>
+                    <View style={styles.txLeft}>
+                      <Text style={styles.txName}>{tx.productName}</Text>
+                      <Text style={styles.txTime}>{new Date(tx.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</Text>
+                    </View>
+                    <View style={styles.txRight}>
+                      {disc > 0 && <Text style={styles.txDiscount}>-€{disc.toFixed(2)}</Text>}
+                      <Text style={[styles.txAmount, { color: margin >= 0 ? Colors.green : Colors.red }]}>€{tx.salePrice.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </Animated.View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function ActionBtn({ icon, label, color, onPress }: { icon: any; label: string; color: string; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[styles.actionBtn, { borderColor: color + '30' }]} onPress={onPress} activeOpacity={0.75}>
+      <View style={[styles.actionIcon, { backgroundColor: color + '18' }]}>
+        <Ionicons name={icon} size={22} color={color} />
+      </View>
+      <Text style={[styles.actionLabel, { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  storeName: { color: Colors.text, fontSize: 20, fontWeight: '800' },
-  eventName: { color: Colors.subtext, fontSize: 12, marginTop: 2 },
-  orgBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primary + '22',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: Colors.primary + '55',
-  },
-  orgBadgeText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
-  scrollContent: { padding: 14, gap: 10 },
-  breakEvenSection: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statsRow: { flexDirection: 'row', gap: 0 },
-  bestSellerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.warning + '44',
-  },
-  bestSellerLabel: { color: Colors.subtext, fontSize: 13 },
-  bestSellerName: { color: Colors.warning, fontSize: 14, fontWeight: '700', flex: 1 },
-  quickActions: { gap: 10, marginTop: 4 },
-  actionButtonPrimary: {
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    padding: 18,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  actionButtonPrimaryText: { color: Colors.text, fontSize: 17, fontWeight: '800' },
-  actionRow: { flexDirection: 'row', gap: 10 },
-  actionButton: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  actionButtonText: { fontSize: 14, fontWeight: '700' },
-  recentSection: { marginTop: 8 },
-  sectionTitle: {
-    color: Colors.subtext,
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  transactionList: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
+  safe: { flex: 1, backgroundColor: Colors.bg0 },
+  scroll: { padding: S.xl, paddingBottom: 40 },
+
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerSuper: { fontSize: F.caption, fontWeight: F.semibold, color: Colors.label3, letterSpacing: 0.6, textTransform: 'uppercase' },
+  headerTitle: { fontSize: F.title2, fontWeight: F.bold, color: Colors.label1, letterSpacing: -0.3, marginTop: 2 },
+  settingsBtn: { width: 38, height: 38, borderRadius: R.full, backgroundColor: Colors.bg3, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.sep },
+
+  breakEvenCard: {
+    backgroundColor: Colors.bg2, borderRadius: R.xl,
+    borderWidth: 1, borderColor: Colors.sep, marginBottom: 16,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.border,
   },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 4,
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  tile: {
+    flex: 1, minWidth: '46%', backgroundColor: Colors.bg2,
+    borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep,
+    padding: 16,
   },
-  viewAllText: { color: Colors.primary, fontSize: 14, fontWeight: '600' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyIcon: { fontSize: 56 },
-  emptyText: { color: Colors.text, fontSize: 20, fontWeight: '700' },
-  setupButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  tileIcon: { width: 36, height: 36, borderRadius: R.sm, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  tileValue: { fontSize: F.title3, fontWeight: F.bold, letterSpacing: -0.3 },
+  tileLabel: { fontSize: F.caption, color: Colors.label3, marginTop: 2, fontWeight: F.medium },
+  tileSub: { fontSize: F.micro, color: Colors.label4, marginTop: 1 },
+
+  actions: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  actionBtn: {
+    flex: 1, backgroundColor: Colors.bg2, borderRadius: R.lg,
+    borderWidth: 1, padding: 14, alignItems: 'center', gap: 8,
   },
-  setupButtonText: { color: Colors.text, fontSize: 15, fontWeight: '700' },
-  noTransactions: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  noTxIcon: { fontSize: 48 },
-  noTxText: { color: Colors.text, fontSize: 18, fontWeight: '700' },
-  noTxSubtext: { color: Colors.subtext, fontSize: 13, textAlign: 'center', lineHeight: 20 },
+  actionIcon: { width: 44, height: 44, borderRadius: R.md, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { fontSize: F.caption, fontWeight: F.semibold },
+
+  section: { backgroundColor: Colors.bg2, borderRadius: R.lg, borderWidth: 1, borderColor: Colors.sep, overflow: 'hidden' },
+  sectionTitle: { fontSize: F.footnote, fontWeight: F.semibold, color: Colors.label3, padding: 16, paddingBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' },
+  txList: {},
+  txRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  txRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.sep },
+  txLeft: {},
+  txRight: { alignItems: 'flex-end' },
+  txName: { fontSize: F.sub, fontWeight: F.medium, color: Colors.label1 },
+  txTime: { fontSize: F.caption, color: Colors.label4, marginTop: 1 },
+  txDiscount: { fontSize: F.micro, color: Colors.orange },
+  txAmount: { fontSize: F.body, fontWeight: F.semibold },
+
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 8 },
+  emptyTitle: { fontSize: F.title3, fontWeight: F.bold, color: Colors.label1 },
+  emptySub: { fontSize: F.body, color: Colors.label3, textAlign: 'center' },
+  emptyBtn: { marginTop: 16, backgroundColor: Colors.primary, borderRadius: R.md, paddingHorizontal: 28, paddingVertical: 12 },
+  emptyBtnLabel: { fontSize: F.callout, fontWeight: F.semibold, color: '#fff' },
 });

@@ -1,235 +1,213 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  SafeAreaView,
-  StatusBar,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  SafeAreaView, StatusBar, ActivityIndicator, KeyboardAvoidingView,
+  Platform, ScrollView, Dimensions,
 } from 'react-native';
+import Animated, {
+  useAnimatedStyle, useSharedValue, withSpring, withTiming,
+  FadeIn, FadeInDown, FadeInUp,
+} from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme/colors';
+import { Colors, R, F, S } from '../theme/colors';
 import { useStore } from '../store/useStore';
-import { LoadingOverlay } from '../components/LoadingOverlay';
-import { ErrorBanner } from '../components/ErrorBanner';
 
-type Props = { navigation: any };
+const { height } = Dimensions.get('window');
 type Tab = 'login' | 'register';
 
-export default function AuthScreen({ navigation }: Props) {
-  const login = useStore(s => s.login);
-  const register = useStore(s => s.register);
-  const isLoading = useStore(s => s.isLoading);
-  const error = useStore(s => s.error);
-  const setError = useStore(s => s.setError);
-
+export default function AuthScreen({ navigation }: { navigation: any }) {
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) return;
-    try {
-      await login(email.trim(), password);
-      navigation.replace('Onboarding');
-    } catch {
-      // error set in store
-    }
+  const login = useStore((s) => s.login);
+  const register = useStore((s) => s.register);
+  const tabAnim = useSharedValue(0);
+
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    setError('');
+    tabAnim.value = withSpring(t === 'login' ? 0 : 1, { damping: 18, stiffness: 300 });
+    Haptics.selectionAsync();
   };
 
-  const handleRegister = async () => {
-    if (!email.trim() || !name.trim() || !password) return;
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
-      return;
-    }
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: withSpring(tabAnim.value * 140, { damping: 18, stiffness: 300 }) }],
+  }));
+
+  const handleSubmit = async () => {
+    setError('');
+    if (!email.trim() || !password.trim()) { setError('Rellena todos los campos'); return; }
+    if (tab === 'register' && !name.trim()) { setError('Introduce tu nombre'); return; }
+    setLoading(true);
     try {
-      await register(email.trim(), name.trim(), password);
+      if (tab === 'login') await login(email.trim(), password);
+      else await register(email.trim(), name.trim(), password);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.replace('Onboarding');
-    } catch {
-      // error set in store
+    } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(e.message || 'Error de conexión');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
-      <LoadingOverlay visible={isLoading} message="Autenticando..." />
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bg0} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.logoArea}>
-            <Text style={styles.logoIcon}>📊</Text>
-            <Text style={styles.appName}>PopUp Analytics</Text>
-            <Text style={styles.tagline}>Comercio transitorio. Datos reales.</Text>
-          </View>
-
-          <View style={styles.tabBar}>
-            <TouchableOpacity
-              style={[styles.tabBtn, tab === 'login' && styles.tabBtnActive]}
-              onPress={() => { setTab('login'); setError(null); }}
-            >
-              <Text style={[styles.tabText, tab === 'login' && styles.tabTextActive]}>Iniciar Sesión</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabBtn, tab === 'register' && styles.tabBtnActive]}
-              onPress={() => { setTab('register'); setError(null); }}
-            >
-              <Text style={[styles.tabText, tab === 'register' && styles.tabTextActive]}>Registrarse</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ErrorBanner message={error} onDismiss={() => setError(null)} />
-
-          <View style={styles.form}>
-            {tab === 'register' && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nombre</Text>
-                <View style={styles.inputRow}>
-                  <Ionicons name="person-outline" size={18} color={Colors.subtext} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Tu nombre completo"
-                    placeholderTextColor={Colors.subtext}
-                    value={name}
-                    onChangeText={setName}
-                    autoCapitalize="words"
-                    returnKeyType="next"
-                  />
-                </View>
-              </View>
-            )}
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email</Text>
-              <View style={styles.inputRow}>
-                <Ionicons name="mail-outline" size={18} color={Colors.subtext} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="tu@email.com"
-                  placeholderTextColor={Colors.subtext}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                />
-              </View>
+          {/* Hero */}
+          <Animated.View entering={FadeInDown.duration(600).springify()} style={styles.hero}>
+            <View style={styles.iconRing}>
+              <Text style={styles.heroIcon}>📊</Text>
             </View>
+            <Text style={styles.heroTitle}>PopUp Analytics</Text>
+            <Text style={styles.heroSub}>Infraestructura financiera para el comercio de calle</Text>
+          </Animated.View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Contraseña</Text>
-              <View style={styles.inputRow}>
-                <Ionicons name="lock-closed-outline" size={18} color={Colors.subtext} />
-                <TextInput
-                  style={styles.input}
-                  placeholder={tab === 'register' ? 'Mínimo 6 caracteres' : 'Tu contraseña'}
-                  placeholderTextColor={Colors.subtext}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  returnKeyType="done"
-                  onSubmitEditing={tab === 'login' ? handleLogin : handleRegister}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(v => !v)}>
-                  <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={18} color={Colors.subtext} />
+          {/* Card */}
+          <Animated.View entering={FadeInUp.delay(150).duration(500).springify()} style={styles.card}>
+
+            {/* Tab switcher */}
+            <View style={styles.tabTrack}>
+              <Animated.View style={[styles.tabIndicator, indicatorStyle]} />
+              {(['login', 'register'] as Tab[]).map((t) => (
+                <TouchableOpacity key={t} style={styles.tabBtn} onPress={() => switchTab(t)} activeOpacity={0.8}>
+                  <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
+                    {t === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+                  </Text>
                 </TouchableOpacity>
-              </View>
+              ))}
             </View>
 
+            <View style={styles.fields}>
+              {tab === 'register' && (
+                <Animated.View entering={FadeIn.duration(300)}>
+                  <FieldGroup label="Nombre">
+                    <TextInput style={styles.textInput} placeholder="Tu nombre completo" placeholderTextColor={Colors.label4} value={name} onChangeText={setName} autoCapitalize="words" />
+                  </FieldGroup>
+                </Animated.View>
+              )}
+
+              <FieldGroup label="Email">
+                <TextInput style={styles.textInput} placeholder="correo@ejemplo.com" placeholderTextColor={Colors.label4} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+              </FieldGroup>
+
+              <FieldGroup label="Contraseña">
+                <View style={styles.passRow}>
+                  <TextInput style={[styles.textInput, { flex: 1 }]} placeholder="Mínimo 6 caracteres" placeholderTextColor={Colors.label4} value={password} onChangeText={setPassword} secureTextEntry={!showPass} />
+                  <TouchableOpacity onPress={() => setShowPass(v => !v)} style={styles.eyeBtn} hitSlop={12}>
+                    <Ionicons name={showPass ? 'eye-off' : 'eye'} size={18} color={Colors.label3} />
+                  </TouchableOpacity>
+                </View>
+              </FieldGroup>
+            </View>
+
+            {!!error && (
+              <Animated.View entering={FadeIn.duration(200)} style={styles.errorBox}>
+                <Ionicons name="alert-circle-outline" size={15} color={Colors.red} />
+                <Text style={styles.errorText}>{error}</Text>
+              </Animated.View>
+            )}
+
             <TouchableOpacity
-              style={[styles.primaryButton, (!email.trim() || !password || (tab === 'register' && !name.trim())) && styles.disabledButton]}
-              onPress={tab === 'login' ? handleLogin : handleRegister}
-              disabled={!email.trim() || !password || (tab === 'register' && !name.trim())}
+              style={[styles.submitBtn, loading && { opacity: 0.7 }]}
+              onPress={handleSubmit} disabled={loading} activeOpacity={0.85}
             >
-              <Text style={styles.primaryButtonText}>
-                {tab === 'login' ? 'Entrar' : 'Crear Cuenta'}
-              </Text>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.submitLabel}>{tab === 'login' ? 'Entrar' : 'Crear cuenta'}</Text>
+              }
             </TouchableOpacity>
 
-            {tab === 'login' && (
-              <View style={styles.demoHint}>
-                <Ionicons name="information-circle-outline" size={14} color={Colors.subtext} />
-                <Text style={styles.demoText}>Demo: demo@popup.com / demo1234</Text>
-              </View>
-            )}
-          </View>
+            <View style={styles.demoRow}>
+              <Text style={styles.demoText}>Demo: </Text>
+              <Text style={styles.demoCode}>demo@example.com / password123</Text>
+            </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.fieldContainer}>{children}</View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  flex: { flex: 1 },
-  scroll: { flexGrow: 1, paddingHorizontal: 20, justifyContent: 'center', paddingVertical: 40 },
-  logoArea: { alignItems: 'center', marginBottom: 36 },
-  logoIcon: { fontSize: 52, marginBottom: 10 },
-  appName: { color: Colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
-  tagline: { color: Colors.subtext, fontSize: 13, marginTop: 6 },
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 16,
+  safe: { flex: 1, backgroundColor: Colors.bg0 },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: S.xl },
+
+  hero: { alignItems: 'center', marginBottom: 36 },
+  iconRing: {
+    width: 80, height: 80, borderRadius: R.xl,
+    backgroundColor: Colors.bg2, borderWidth: 1, borderColor: Colors.sep,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 24,
   },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
+  heroIcon: { fontSize: 38 },
+  heroTitle: { fontSize: F.title1, fontWeight: F.bold, color: Colors.label1, letterSpacing: -0.5 },
+  heroSub: { fontSize: F.footnote, color: Colors.label3, textAlign: 'center', marginTop: 6, maxWidth: 260 },
+
+  card: {
+    backgroundColor: Colors.bg2, borderRadius: R.xl,
+    borderWidth: 1, borderColor: Colors.sep, padding: 24,
   },
-  tabBtnActive: { backgroundColor: Colors.primary },
-  tabText: { color: Colors.subtext, fontSize: 14, fontWeight: '600' },
-  tabTextActive: { color: Colors.text },
-  form: { gap: 14 },
-  inputGroup: { gap: 6 },
-  label: { color: Colors.subtext, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    gap: 10,
+
+  tabTrack: {
+    flexDirection: 'row', backgroundColor: Colors.bg1, borderRadius: R.md,
+    padding: 3, marginBottom: 24, position: 'relative',
   },
-  input: {
-    flex: 1,
-    color: Colors.text,
-    fontSize: 15,
-    paddingVertical: 13,
+  tabIndicator: {
+    position: 'absolute', top: 3, left: 3, width: 140, height: '100%',
+    backgroundColor: Colors.bg3, borderRadius: R.sm, marginVertical: -3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6,
   },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 4,
+  tabBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', zIndex: 1 },
+  tabLabel: { fontSize: F.footnote, fontWeight: F.medium, color: Colors.label3 },
+  tabLabelActive: { color: Colors.label1, fontWeight: F.semibold },
+
+  fields: { marginBottom: 4 },
+  fieldLabel: { fontSize: F.caption, fontWeight: F.semibold, color: Colors.label3, marginBottom: 6, letterSpacing: 0.4 },
+  fieldContainer: {
+    backgroundColor: Colors.bg3, borderRadius: R.md,
+    borderWidth: 1, borderColor: Colors.sep, paddingHorizontal: 14,
   },
-  disabledButton: { opacity: 0.4 },
-  primaryButtonText: { color: Colors.text, fontSize: 16, fontWeight: '800' },
-  demoHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 4,
+  textInput: { color: Colors.label1, fontSize: F.body, paddingVertical: 13 },
+  passRow: { flexDirection: 'row', alignItems: 'center' },
+  eyeBtn: { padding: 10 },
+
+  errorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.redSoft, borderRadius: R.sm,
+    padding: 10, marginBottom: 14,
   },
-  demoText: { color: Colors.subtext, fontSize: 12 },
+  errorText: { flex: 1, fontSize: F.caption, color: Colors.red },
+
+  submitBtn: {
+    backgroundColor: Colors.primary, borderRadius: R.md,
+    paddingVertical: 15, alignItems: 'center', marginTop: 8,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35, shadowRadius: 16,
+  },
+  submitLabel: { fontSize: F.body, fontWeight: F.semibold, color: '#fff', letterSpacing: 0.2 },
+
+  demoRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 16 },
+  demoText: { fontSize: F.caption, color: Colors.label4 },
+  demoCode: { fontSize: F.caption, color: Colors.label3 },
 });

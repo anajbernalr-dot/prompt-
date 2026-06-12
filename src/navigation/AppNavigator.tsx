@@ -1,9 +1,12 @@
 import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../theme/colors';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import { Colors, R, F } from '../theme/colors';
 
 import AuthScreen from '../screens/AuthScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
@@ -20,41 +23,67 @@ import SettingsScreen from '../screens/SettingsScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const DarkTheme = {
+const NavTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    background: Colors.background,
-    card: Colors.card,
-    text: Colors.text,
-    border: Colors.border,
+    background: Colors.bg0,
+    card: Colors.bg1,
+    text: Colors.label1,
+    border: Colors.sep,
     primary: Colors.primary,
     notification: Colors.primary,
   },
 };
+
+// Custom animated tab bar button
+function TabBtn({ children, onPress, accessibilityState }: any) {
+  const scale = useSharedValue(1);
+  const focused = accessibilityState?.selected;
+
+  const anim = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        Haptics.selectionAsync();
+        scale.value = withSpring(0.88, { damping: 8, stiffness: 500 }, () => {
+          scale.value = withSpring(1, { damping: 10, stiffness: 300 });
+        });
+        onPress();
+      }}
+      style={styles.tabBtn}
+      activeOpacity={1}
+    >
+      <Animated.View style={[styles.tabInner, focused && styles.tabInnerFocused, anim]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Colors.card,
-          borderTopColor: Colors.border,
-          borderTopWidth: 1,
-          paddingBottom: 4,
-          height: 60,
-        },
+        tabBarStyle: styles.tabBar,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.subtext,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-        tabBarIcon: ({ color, size, focused }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = 'home';
-          if (route.name === 'Dashboard') iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'QuickTap') iconName = focused ? 'flash' : 'flash-outline';
-          else if (route.name === 'Reports') iconName = focused ? 'bar-chart' : 'bar-chart-outline';
-          else if (route.name === 'Settings') iconName = focused ? 'settings' : 'settings-outline';
-          return <Ionicons name={iconName} size={size} color={color} />;
+        tabBarInactiveTintColor: Colors.label4,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarButton: (props) => <TabBtn {...props} />,
+        tabBarIcon: ({ color, focused }) => {
+          const icons: Record<string, [string, string]> = {
+            Dashboard: ['home', 'home-outline'],
+            QuickTap: ['flash', 'flash-outline'],
+            Reports: ['bar-chart', 'bar-chart-outline'],
+            Settings: ['settings', 'settings-outline'],
+          };
+          const [on, off] = icons[route.name] ?? ['ellipse', 'ellipse-outline'];
+          return <Ionicons name={(focused ? on : off) as any} size={22} color={color} />;
         },
       })}
     >
@@ -68,12 +97,23 @@ function MainTabs() {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer theme={DarkTheme}>
+    <NavigationContainer theme={NavTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: Colors.background },
+          cardStyle: { backgroundColor: Colors.bg0 },
           animationEnabled: true,
+          cardStyleInterpolator: ({ current, layouts }) => ({
+            cardStyle: {
+              transform: [{
+                translateX: current.progress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [layouts.screen.width * 0.08, 0],
+                }),
+              }],
+              opacity: current.progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.7, 1] }),
+            },
+          }),
         }}
         initialRouteName="Auth"
       >
@@ -89,3 +129,18 @@ export default function AppNavigator() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    backgroundColor: Colors.bg1,
+    borderTopColor: Colors.sep,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    height: 72,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+  tabBtn: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tabInner: { alignItems: 'center', justifyContent: 'center', gap: 3, padding: 6, borderRadius: R.md },
+  tabInnerFocused: { backgroundColor: Colors.primarySoft },
+  tabLabel: { fontSize: F.micro, fontWeight: F.semibold, letterSpacing: 0.2 },
+});
