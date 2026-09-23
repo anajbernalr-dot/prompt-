@@ -20,19 +20,21 @@ export async function openDirections(lat: number, lng: number, label: string) {
 export async function shareText(message: string, title = "Pa' Donde Vamos Hoy?"): Promise<boolean> {
   if (Platform.OS === 'web') {
     const nav = globalThis.navigator as Navigator | undefined;
-    try {
-      if (nav?.share) {
+    if (nav?.share) {
+      try {
         await nav.share({ title, text: message });
         return true;
+      } catch (e) {
+        // The user closed the share sheet: don't also copy.
+        if ((e as Error)?.name === 'AbortError') return false;
       }
-      if (nav?.clipboard) {
-        await nav.clipboard.writeText(message);
-        return true;
-      }
+    }
+    try {
+      await nav?.clipboard?.writeText(message);
+      return !!nav?.clipboard;
     } catch {
       return false;
     }
-    return false;
   }
   try {
     const res = await Share.share({ message, title });
