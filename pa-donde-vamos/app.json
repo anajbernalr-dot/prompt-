@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Pa' Donde Vamos Hoy?",
+    "slug": "pa-donde-vamos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "padondevamos",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#EFE9DC",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.padondevamos.app"
+    },
+    "android": {
+      "package": "com.padondevamos.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#EFE9DC",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "Pa' Donde Vamos Hoy?",
+      "shortName": "Pa' Donde Vamos",
+      "themeColor": "#EFE9DC",
+      "backgroundColor": "#EFE9DC"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#EFE9DC",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 140
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "reactCompiler": true
+    }
+  }
+}
