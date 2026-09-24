@@ -93,12 +93,12 @@ export function seedNotifications(now: Date = new Date()): AppNotification[] {
 }
 
 export function seedChats(now: Date = new Date()): Record<string, ChatMessage[]> {
-  const today = (h: number, m: number) => atDay(0, h, m, now);
+  const minutesAgo = (m: number) => new Date(now.getTime() - m * 60_000).toISOString();
   return {
     luisv: [
-      { id: 'm1', from: 'luisv', text: '¿Nos vemos en el café?', at: today(9, 32) },
-      { id: 'm2', from: 'me', text: 'Sí!! 10 am?', at: today(9, 33) },
-      { id: 'm3', from: 'luisv', text: 'Perfecto', at: today(9, 34) },
+      { id: 'm1', from: 'luisv', text: '¿Nos vemos en el café?', at: minutesAgo(52) },
+      { id: 'm2', from: 'me', text: 'Sí!! 10 am?', at: minutesAgo(51) },
+      { id: 'm3', from: 'luisv', text: 'Perfecto', at: minutesAgo(50) },
     ],
     anasofi: [
       { id: 'm4', from: 'anasofi', text: 'El domingo brunch en Mamey, ¿sí o sí?', at: hoursAgo(20, now) },
