@@ -27,23 +27,13 @@ export function FeaturedCard({ spot }: { spot: Spot }) {
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${spot.name}. ${spotSubtitle(spot)}`}
-      onPress={open}
-      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.99 : 1 }] })}>
-      <Photo source={spot.image} rounded={22} gradient style={styles.photo}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={saved ? 'Quitar de guardados' : 'Guardar'}
-          accessibilityState={{ selected: saved }}
-          hitSlop={6}
-          onPress={toggleSave}
-          style={({ pressed }) => [styles.heart, pressed && { opacity: 0.6 }]}>
-          <FilledIcon name={saved ? 'heart' : 'heart-outline'} size={25} color={colors.white} />
-        </Pressable>
-
-        <View style={styles.bottom}>
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${spot.name}. ${spotSubtitle(spot)}`}
+        onPress={open}
+        style={({ pressed }) => [StyleSheet.absoluteFill, { opacity: pressed ? 0.94 : 1 }]}>
+        <Photo source={spot.image} rounded={22} gradient style={styles.photo}>
           <View style={styles.texts}>
             <AppText style={styles.title} numberOfLines={2}>
               {spot.name}
@@ -52,22 +42,34 @@ export function FeaturedCard({ spot }: { spot: Spot }) {
               {spotSubtitle(spot)}
             </AppText>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Abrir ${spot.name}`}
-            hitSlop={6}
-            onPress={open}
-            style={({ pressed }) => [styles.go, pressed && { backgroundColor: colors.blueInk }]}>
-            <FilledIcon name="arrow-forward" size={22} color={colors.white} />
-          </Pressable>
-        </View>
-      </Photo>
-    </Pressable>
+        </Photo>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={saved ? 'Quitar de guardados' : 'Guardar'}
+        accessibilityState={{ selected: saved }}
+        hitSlop={6}
+        onPress={toggleSave}
+        style={({ pressed }) => [styles.heart, pressed && { opacity: 0.6 }]}>
+        <FilledIcon name={saved ? 'heart' : 'heart-outline'} size={25} color={colors.white} />
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir ${spot.name}`}
+        hitSlop={6}
+        onPress={open}
+        style={({ pressed }) => [styles.go, pressed && { backgroundColor: colors.blueInk }]}>
+        <FilledIcon name="arrow-forward" size={22} color={colors.white} />
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  photo: { height: 240, justifyContent: 'flex-end' },
+  card: { height: 250, borderRadius: 22 },
+  photo: { flex: 1, justifyContent: 'flex-end' },
   heart: {
     position: 'absolute',
     top: 10,
@@ -77,8 +79,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 18, paddingBottom: 16 },
-  texts: { flex: 1, gap: 6 },
+  texts: { gap: 6, paddingLeft: 18, paddingRight: 76, paddingBottom: 16 },
   title: {
     fontFamily: fonts.serifBold,
     fontSize: 28,
@@ -88,6 +89,9 @@ const styles = StyleSheet.create({
   },
   subtitle: { fontFamily: fonts.sansMedium, fontSize: 13.5, color: 'rgba(255,255,255,0.85)' },
   go: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
     width: 44,
     height: 44,
     borderRadius: 22,
