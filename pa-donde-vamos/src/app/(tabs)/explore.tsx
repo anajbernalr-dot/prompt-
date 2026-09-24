@@ -125,7 +125,8 @@ export default function ExploreScreen() {
               style={styles.emptyAction}
               onPress={() => {
                 setQuery('');
-                onCat('todo');
+                setCat('todo');
+                router.setParams({ q: undefined, cat: 'todo' });
               }}
             />
           }

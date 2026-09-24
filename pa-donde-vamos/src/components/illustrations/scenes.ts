@@ -1,7 +1,6 @@
 // The artwork itself. Coordinates are in each viewBox; see motifs.ts for the building blocks.
 import {
   asterisk,
-  bean,
   featherFrond,
   serratedFrond,
   sodaBottle,
@@ -16,58 +15,80 @@ import { sketch, type Pen, type Pt } from './pen';
 /* Shared pieces                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Fist wrapped around a wine-glass stem (glass-local coords, stem top at y=h). Arm leaves to the lower left. */
-function fist(p: Pen, h: number, arm: { len: number; angle: number }) {
-  const y = h;
-  // index finger + back of hand
+/** Fist gripping a vertical stem at x=0; grip spans y=0..23. Arm leaves at `angle`° (down-left by default). */
+function fist(p: Pen, arm: { len: number; angle: number }) {
+  // curled index finger over the back of the hand
   p.curve([
-    [-15, y + 6],
-    [-10, y + 2.6],
-    [-3, y + 1.4],
-    [4, y + 2.4],
-    [7.6, y + 5.4],
-    [6.4, y + 8.6],
-    [1.6, y + 9],
+    [-14, 4],
+    [-7, 0.8],
+    [1, 0],
+    [7.5, 1.8],
+    [10.6, 5.6],
+    [8.6, 9.4],
+    [3, 9.8],
   ]);
-  // middle + ring fingers
+  // middle finger
   p.curve([
-    [6.6, y + 9.4],
-    [8.2, y + 12],
-    [6.2, y + 14.6],
-    [1.2, y + 14.6],
+    [8.8, 10],
+    [11.2, 13.4],
+    [9, 16.6],
+    [3.4, 16.8],
   ]);
+  // ring + pinky
   p.curve([
-    [6.2, y + 15.2],
-    [7.2, y + 17.8],
-    [4.6, y + 19.8],
-    [-1, y + 19.8],
+    [8.4, 17],
+    [9.8, 20.2],
+    [6.6, 22.8],
+    [0, 23],
   ]);
   // heel of the palm
   p.curve([
-    [-1, y + 19.8],
-    [-6.5, y + 20.8],
-    [-12, y + 20.6],
-    [-16, y + 18.5],
+    [0, 23],
+    [-7, 24],
+    [-13, 22.4],
+    [-17, 19.4],
   ]);
-  // thumb resting over the index finger
+  // thumb over the index finger
   p.curve([
-    [-10, y + 7.4],
-    [-3, y + 8.2],
-    [2.6, y + 6.6],
+    [-12, 7.6],
+    [-5, 9.4],
+    [2, 8.2],
+    [4.4, 5.6],
   ]);
-  // arm
+  p.line(-2, 3.2, 1.4, 3.6);
+  // forearm
   const a = (arm.angle * Math.PI) / 180;
-  const dx = Math.cos(a) * arm.len;
-  const dy = Math.sin(a) * arm.len;
-  p.line(-15, y + 6, -15 + dx, y + 6 + dy, -1.2);
-  p.line(-16, y + 18.5, -16 + dx * 0.86, y + 18.5 + dy * 0.86, -1);
-  // sleeve texture
-  for (let i = 0; i < 3; i++) {
-    const k = 0.45 + i * 0.12;
-    const x = -16 + dx * k * 0.86;
-    const yy = y + 18.5 + dy * k * 0.86;
-    p.line(x + 1, yy - 3, x + 3.4, yy - 4.6);
+  const ux = Math.cos(a);
+  const uy = Math.sin(a);
+  p.line(-14, 4, -14 + ux * arm.len, 4 + uy * arm.len, -1.4);
+  p.line(-17, 19.4, -17 + ux * arm.len * 0.84, 19.4 + uy * arm.len * 0.84, -1);
+  // cuff with a bit of hatching
+  const cx = -15.5 + ux * arm.len * 0.4;
+  const cy = 11.7 + uy * arm.len * 0.4;
+  const nx = -uy;
+  const ny = ux;
+  p.line(cx + nx * 9, cy + ny * 9, cx - nx * 9.5, cy - ny * 9.5, 0.8);
+  for (let i = 0; i < 4; i++) {
+    const k = 0.44 + i * 0.06;
+    const x = -15.5 + ux * arm.len * k;
+    const y = 11.7 + uy * arm.len * k;
+    p.line(x + nx * 6, y + ny * 6, x + nx * 1 + ux * 3, y + ny * 1 + uy * 3);
   }
+}
+
+/** Glass held in a fist: glass rim at (0,0), hand gripping the middle of the stem. */
+function heldGlass(p: Pen, liquid: number, armLen: number) {
+  const r = 21;
+  const h = 46;
+  const grip = 10;
+  const s = 1.2;
+  const gh = 23 * s;
+  const stem = grip + gh + 8;
+  wineGlass(p, r, h, stem, { liquid, bubbles: 5, stemFrom: 0, stemTo: grip });
+  p.line(-1.2, h + grip + gh, -1.1, h + stem).line(1.2, h + grip + gh, 1.1, h + stem);
+  p.push(0, h + grip, 0, s);
+  fist(p, { len: armLen, angle: 122 });
+  p.pop();
 }
 
 /** Serrated Caracas palm, crown at (0,0), trunk base around (-66, 126). */
@@ -247,32 +268,30 @@ export const welcomeArt = sketch(320, 256, 7, (p) => {
 });
 
 export const cheersArt = sketch(260, 195, 11, (p) => {
-  p.w(2.4);
-  // left glass + hand
-  p.push(112, 58, 14);
-  wineGlass(p, 18, 42, 32, { liquid: 0.4, bubbles: 4, stemFrom: 0, stemTo: 32 });
-  fist(p, 42 + 4, { len: 78, angle: 128 });
+  p.w(2.5);
+  p.push(109, 38, 17);
+  heldGlass(p, 0.42, 110);
   p.pop();
-  // right glass + hand (mirrored)
-  p.push(148, 58, -14, -1, 1);
-  wineGlass(p, 18, 42, 32, { liquid: 0.44, bubbles: 4 });
-  fist(p, 42 + 4, { len: 78, angle: 128 });
+  p.push(151, 38, -17, -1, 1);
+  heldGlass(p, 0.46, 110);
   p.pop();
   // clink sparks
-  p.w(2.2);
-  p.rays(130, 44, 10, 26, [-150, -120, -90, -60, -30]);
-  p.rays(130, 70, 10, 22, [60, 90, 120]);
-  // around the glasses
-  p.rays(90, 50, 26, 38, [-170, -140, 180]);
-  p.rays(170, 50, 26, 38, [-10, -40, 0]);
-  // confetti
-  bean(p, 60, 24, 9, 60);
-  bean(p, 206, 30, 9, -50);
-  bean(p, 36, 96, 8, 20);
-  bean(p, 222, 104, 8, -20);
-  bean(p, 130, 150, 8, 80);
-  bean(p, 96, 12, 7, 30);
-  p.dot(24, 60, 1.6).dot(238, 70, 1.6).dot(160, 12, 1.4).dot(52, 140, 1.3).dot(206, 150, 1.3).dot(180, 176, 1.2);
+  p.w(2.3);
+  p.rays(130, 34, 11, 30, [-158, -128, -96, -64, -30]);
+  p.rays(130, 74, 12, 26, [72, 92, 112]);
+  // swish lines beside the bowls
+  p.line(58, 44, 72, 46).line(60, 58, 70, 57).line(188, 46, 202, 44).line(190, 57, 200, 58);
+  p.line(66, 28, 74, 34).line(194, 34, 202, 28);
+  // confetti ticks + dots
+  p.line(34, 36, 40, 30).line(222, 30, 228, 36).line(28, 100, 35, 102).line(228, 96, 234, 91);
+  p.line(96, 8, 100, 14).line(162, 14, 167, 8);
+  p.push(48, 70);
+  sparkle(p, 4);
+  p.pop();
+  p.push(212, 72);
+  sparkle(p, 3.6);
+  p.pop();
+  p.dot(22, 62, 1.6).dot(240, 60, 1.6).dot(130, 8, 1.4).dot(150, 150, 1.3).dot(110, 156, 1.2).dot(84, 18, 1.2);
 });
 
 export const palmSunArt = sketch(300, 240, 23, (p) => {
@@ -341,11 +360,16 @@ export const swooshArt = sketch(120, 30, 13, (p) => {
 
 export const leafArt = sketch(48, 48, 17, (p) => {
   p.w(2.2);
-  serratedFrond(p, [[10, 42], [18, 28], [28, 16], [40, 8]], 7, 5);
-  p.push(38, 34);
-  sparkle(p, 4);
+  // leaf outline, midrib and veins
+  p.curve([[12, 38], [10, 26], [16, 14], [28, 8], [38, 6]]);
+  p.curve([[12, 38], [24, 36], [34, 28], [38, 17], [38, 6]]);
+  p.curve([[6, 44], [12, 38], [22, 26], [31, 16], [37, 8]]);
+  p.line(17, 31, 13, 24).line(22, 25, 18, 16).line(27, 19, 25, 11);
+  p.line(19, 29, 27, 32).line(24, 23, 33, 24).line(29, 17, 36, 16);
+  p.push(40, 36);
+  sparkle(p, 4.2);
   p.pop();
-  p.dot(8, 12, 1.2);
+  p.dot(6, 12, 1.3).dot(44, 26, 1.1);
 });
 
 /* ------------------------------------------------------------------ */
