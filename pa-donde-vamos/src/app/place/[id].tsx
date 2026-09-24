@@ -157,7 +157,7 @@ function PlaceDetail({ place }: { place: Place }) {
 
       <FriendsGoing placeId={place.id} />
 
-      <HowToGet spot={placeSpot(place)} lat={place.lat} lng={place.lng} address={`${place.address}, ${place.zone}`} />
+      <HowToGet spot={placeSpot(place)} lat={place.lat} lng={place.lng} address={place.address} />
 
       <ReviewsSection target={{ kind: 'place', id: place.id }} />
     </Screen>

@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   saveLabel: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   ctas: { marginTop: 16, gap: 12 },
   cta: { width: '64%' },
-  caption: { marginTop: 8, marginLeft: 4 },
+  caption: { marginTop: 8, marginLeft: 4, width: '58%' },
   below: { paddingHorizontal: 22, paddingBottom: 40 },
   note: { position: 'absolute', right: -2, bottom: -14 },
 });
