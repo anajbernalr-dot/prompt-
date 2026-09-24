@@ -107,7 +107,7 @@ export default function HomeScreen() {
         if (!author) return null;
         return (
           <View key={r.id}>
-            {i > 0 ? <View style={styles.sep} /> : null}
+            {i > 0 && i !== 2 ? <View style={styles.sep} /> : null}
             <ReviewCard review={r} author={author} />
             {i === 1 || (i === feed.length - 1 && feed.length < 2) ? (
               <Interlude nearby={nearby} upcoming={upcoming} />
