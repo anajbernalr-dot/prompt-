@@ -92,6 +92,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" />
           <Stack.Screen name="inspiration" options={{ animation: 'fade' }} />
           <Stack.Screen name="plans/[id]" />
+          <Stack.Screen name="review/new" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="plan/new" options={{ animation: 'slide_from_bottom' }} />
           <Stack.Screen name="plan/place" />
           <Stack.Screen name="plan/friends" />

@@ -6,6 +6,8 @@ import type { AppEvent } from './types';
 export const events: AppEvent[] = [
   {
     id: 'jazz-candelaria',
+    // TODO: replace with the organizer's official ticket page.
+    ticketUrl: 'https://www.google.com/search?q=Noche+de+Jazz+en+La+Candelaria+Caracas+entradas',
     title: 'Noche de Jazz en La Candelaria',
     category: 'Música',
     zone: 'La Candelaria',
@@ -38,6 +40,8 @@ export const events: AppEvent[] = [
   },
   {
     id: 'cine-parque',
+    // TODO: replace with the organizer's official ticket page.
+    ticketUrl: 'https://www.google.com/search?q=Cine+bajo+las+estrellas+Parque+del+Este+Caracas+entradas',
     title: 'Cine bajo las estrellas',
     category: 'Cultura',
     zone: 'Parque del Este',

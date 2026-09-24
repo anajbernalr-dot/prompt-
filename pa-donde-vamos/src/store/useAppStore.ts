@@ -14,7 +14,7 @@ import {
   seedNotifications,
   seedPlans,
 } from '@/data/seed';
-import type { AppNotification, ChatMessage, Plan, PlanDraft, User } from '@/data/types';
+import type { AppNotification, ChatMessage, Plan, PlanDraft, Reaction, Review, User } from '@/data/types';
 import { makeHandle, uid } from '@/lib/format';
 
 export type Settings = {
@@ -44,6 +44,10 @@ type Data = {
   settings: Settings;
   /** Plan being built in the "Crear plan" flow. */
   draft: PlanDraft;
+  /** Reviews written by the user (shown in the feed together with data/reviews seedReviews). */
+  myReviews: Review[];
+  /** Review ids the user liked. */
+  likedReviews: string[];
 };
 
 type Actions = {
@@ -78,6 +82,10 @@ type Actions = {
   commitDraft: () => string | null;
   deletePlan: (id: string) => void;
 
+  addReview: (input: { target: Review['target']; rating: number; reaction: Reaction; text: string }) => string;
+  deleteReview: (id: string) => void;
+  toggleLikeReview: (id: string) => void;
+
   resetDemo: () => void;
 };
 
@@ -105,6 +113,8 @@ const initialData: Data = {
     shareLocation: true,
   },
   draft: emptyDraft,
+  myReviews: [],
+  likedReviews: [],
 };
 
 /** Sample content every new account starts with, so the app feels alive. */
@@ -310,6 +320,28 @@ export const useAppStore = create<AppState>()(
 
       deletePlan: (id) => set({ plans: get().plans.filter((p) => p.id !== id) }),
 
+      addReview: ({ target, rating, reaction, text }) => {
+        const review: Review = {
+          id: uid(),
+          authorId: 'me',
+          target,
+          rating,
+          reaction,
+          text: text.trim(),
+          at: new Date().toISOString(),
+          likes: 0,
+        };
+        set({ myReviews: [review, ...get().myReviews] });
+        return review.id;
+      },
+
+      deleteReview: (id) => set({ myReviews: get().myReviews.filter((r) => r.id !== id) }),
+
+      toggleLikeReview: (id) => {
+        const { likedReviews } = get();
+        set({ likedReviews: likedReviews.includes(id) ? likedReviews.filter((x) => x !== id) : [...likedReviews, id] });
+      },
+
       resetDemo: () => {
         const user = get().user;
         set({ ...starterContent(), user, onboarded: true });
@@ -317,7 +349,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'pa-donde-vamos',
-      version: 1,
+      version: 2,
+      // v2 added reviews; older saved state just gets the new empty fields.
+      migrate: (state) => ({ ...initialData, ...(state as object) }) as AppState,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: ({ hydrated: _hydrated, ...rest }) =>
         Object.fromEntries(Object.entries(rest).filter(([, v]) => typeof v !== 'function')) as Data,

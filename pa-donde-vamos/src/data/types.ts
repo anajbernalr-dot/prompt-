@@ -40,6 +40,8 @@ export type AppEvent = {
   /** ISO date-time. */
   date: string;
   price: string;
+  /** Official page where tickets are sold. Paid events open this instead of buying in-app. */
+  ticketUrl?: string;
   description: string;
   /** Key into `images.events`. */
   image: string;
@@ -113,4 +115,24 @@ export type PlanDraft = {
   date?: string;
   friendIds: string[];
   comment?: string;
+};
+
+/** Letterboxd-style verdict. */
+export type Reaction = 'love' | 'meh' | 'nope';
+
+/** A review / feed post about a place or event. */
+export type Review = {
+  id: string;
+  /** 'me' or a friend id or a community author id (see data/reviews `authors`). */
+  authorId: string;
+  target: { kind: 'place' | 'event'; id: string };
+  /** 1–5, halves allowed (e.g. 4.5). */
+  rating: number;
+  reaction: Reaction;
+  text: string;
+  /** Key into place/event images, or undefined to use the target's cover. */
+  photo?: string;
+  /** ISO date-time. */
+  at: string;
+  likes: number;
 };
