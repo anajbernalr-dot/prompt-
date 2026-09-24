@@ -30,6 +30,7 @@ export function OptionRow({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
+      aria-checked={selected}
       accessibilityLabel={[title, meta, detail].filter(Boolean).join(', ')}
       onPress={() => {
         tap();
@@ -38,7 +39,7 @@ export function OptionRow({
       style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && { opacity: 0.85 }]}>
       {leading ?? (image ? <Photo source={image} rounded={12} style={styles.thumb} /> : null)}
       <View style={styles.text}>
-        <AppText variant="title" numberOfLines={1}>
+        <AppText variant="title" numberOfLines={2}>
           {title}
         </AppText>
         {meta ? (

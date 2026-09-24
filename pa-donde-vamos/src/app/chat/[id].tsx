@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/Button';
 import { Bubble, DaySeparator, TypingBubble } from '@/components/chat/Bubble';
 import { ChatHeader, type MenuItem } from '@/components/chat/ChatHeader';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -10,12 +11,11 @@ import { GlassesDoodle } from '@/components/illustrations';
 import { Screen } from '@/components/Screen';
 import { EmptyState } from '@/components/Surfaces';
 import { showToast } from '@/components/Toast';
-import { Button } from '@/components/Button';
 import { Handwritten } from '@/components/Typography';
 import { getFriend } from '@/data/friends';
 import type { ChatMessage } from '@/data/types';
-import { formatDayShort } from '@/lib/format';
 import { tap } from '@/lib/actions';
+import { formatDayShort } from '@/lib/format';
 import { planWithFriend, useAppStore } from '@/store/useAppStore';
 
 const EMPTY: ChatMessage[] = [];
@@ -122,7 +122,7 @@ export default function ChatScreen() {
         })}
         {typing ? <TypingBubble name={friend.name} /> : null}
         {short ? (
-          <View style={styles.decoration} pointerEvents="none">
+          <View style={styles.decoration}>
             <GlassesDoodle width={120} />
             <Handwritten size={30} rotate={-14} style={styles.note}>
               Nos vemos
@@ -144,7 +144,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   list: { flex: 1, marginHorizontal: -22 },
   listContent: { flexGrow: 1, paddingHorizontal: 22, paddingTop: 20, paddingBottom: 12 },
-  decoration: { flex: 1, minHeight: 190, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 28 },
+  decoration: { pointerEvents: 'none', flex: 1, minHeight: 190, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 28 },
   note: { marginTop: -8, marginRight: -6 },
-  backdrop: { ...StyleSheet.absoluteFillObject, zIndex: 5 },
+  backdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 },
 });

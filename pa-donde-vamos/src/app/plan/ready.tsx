@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 18.5, lineHeight: 24, marginBottom: 4 },
   stack: { marginTop: 20 },
   actions: { gap: 14, marginTop: 30 },
-  doodle: { alignSelf: 'flex-end', width: 150, height: 86, marginTop: 14 },
-  note: { position: 'absolute', right: 14, top: 0, lineHeight: 26 },
-  star: { position: 'absolute', right: 2, bottom: 0 },
+  doodle: { alignSelf: 'flex-end', width: 150, height: 80, marginTop: 14 },
+  note: { position: 'absolute', right: 18, top: 0, lineHeight: 26 },
+  star: { position: 'absolute', right: 2, top: 44 },
 });

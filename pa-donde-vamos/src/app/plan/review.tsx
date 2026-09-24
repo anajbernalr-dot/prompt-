@@ -12,32 +12,36 @@ import { Asterisk } from '@/components/illustrations';
 import { draftHasTarget } from '@/components/plan/meta';
 import { PlanSummaryCard } from '@/components/plan/PlanSummaryCard';
 import { useDraftGuard } from '@/components/plan/useDraftGuard';
+import type { PlanDraft } from '@/data/types';
 import { success, tap } from '@/lib/actions';
 import { useAppStore } from '@/store/useAppStore';
 import { colors, fonts, radius } from '@/theme';
 
 export default function PlanReviewScreen() {
   useDraftGuard(draftHasTarget, '/plan/new');
-  const draft = useAppStore((s) => s.draft);
+  const liveDraft = useAppStore((s) => s.draft);
+  // Committing clears the draft; keep showing what was created until the screen is replaced.
+  const [committed, setCommitted] = useState<PlanDraft | null>(null);
+  const draft = committed ?? liveDraft;
   const setDraft = useAppStore((s) => s.setDraft);
   const commitDraft = useAppStore((s) => s.commitDraft);
   const [commentOpen, setCommentOpen] = useState(() => !!draft.comment);
-  const [creating, setCreating] = useState(false);
 
   const create = () => {
-    if (creating) return;
-    setCreating(true);
+    if (committed) return;
+    const snapshot = useAppStore.getState().draft;
     const id = commitDraft();
     if (!id) {
       router.replace('/plan/new');
       return;
     }
+    setCommitted(snapshot);
     success();
     router.replace(`/plan/ready?id=${id}`);
   };
 
   return (
-    <Screen keyboard footer={<Button label="Crear plan" onPress={create} disabled={!draftHasTarget(draft) && !creating} />}>
+    <Screen keyboard footer={<Button label="Crear plan" onPress={create} disabled={!draftHasTarget(draft)} />}>
       <Header title="Revisemos tu plan" fallback="/plan/friends" />
 
       {draftHasTarget(draft) ? (
@@ -58,7 +62,7 @@ export default function PlanReviewScreen() {
         <View style={styles.rowWrap}>
           <MenuRow
             icon="message-square"
-            label={draft.comment?.trim() ? 'Editar comentario' : 'Agregar comentario'}
+            label={!commentOpen && draft.comment?.trim() ? 'Editar comentario' : 'Agregar comentario'}
             onPress={() => {
               tap();
               setCommentOpen((o) => !o);

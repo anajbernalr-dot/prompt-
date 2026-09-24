@@ -64,6 +64,7 @@ export default function PlanFriendsScreen() {
                 key={f.id}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked }}
+                aria-checked={checked}
                 accessibilityLabel={`${f.name}, @${f.handle}`}
                 onPress={() => toggle(f.id)}
                 style={({ pressed }) => [
@@ -115,7 +116,7 @@ export default function PlanFriendsScreen() {
 
 const styles = StyleSheet.create({
   title: { marginTop: 10, fontSize: 34, lineHeight: 40 },
-  body: { marginTop: 10, marginBottom: 22, maxWidth: 300 },
+  body: { marginTop: 10, marginBottom: 22, maxWidth: 290 },
   group: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
@@ -139,7 +140,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addWrap: { minHeight: 120 },
-  doodle: { position: 'absolute', right: 2, top: 44, width: 120, height: 70 },
-  note: { position: 'absolute', right: 10, top: 0, lineHeight: 21 },
-  star: { position: 'absolute', right: 0, bottom: 2 },
+  doodle: { position: 'absolute', right: 4, top: 52, width: 120, height: 62 },
+  note: { position: 'absolute', right: 14, top: 0, lineHeight: 21 },
+  star: { position: 'absolute', right: 0, top: 40 },
 });

@@ -9,7 +9,7 @@ import {
   trunk,
   wineGlass,
 } from './motifs';
-import { sketch, type Pen, type Pt } from './pen';
+import { guide, sketch, type Pen, type Pt } from './pen';
 
 /* ------------------------------------------------------------------ */
 /* Shared pieces                                                       */
@@ -372,6 +372,37 @@ export const leafArt = sketch(48, 48, 17, (p) => {
   p.dot(6, 12, 1.3).dot(44, 26, 1.1);
 });
 
+/** Bold leaf-shaped frond (for the app icon): outline, partial midrib and a few notches. */
+function leafFrond(p: Pen, pts: Pt[], width: number, cuts: number) {
+  const g = guide(pts);
+  const prof = (s: number) => Math.pow(Math.sin(Math.PI * s), 0.8) * (1 - 0.25 * s);
+  const edge = (side: 1 | -1) => {
+    const out: Pt[] = [];
+    for (let i = 0; i <= 8; i++) {
+      const s = i / 8;
+      const f = g.at(s);
+      out.push([f.p[0] + f.n[0] * side * width * prof(s), f.p[1] + f.n[1] * side * width * prof(s)]);
+    }
+    return out;
+  };
+  p.curve(edge(1), { jitter: 0.3 }).curve(edge(-1), { jitter: 0.3 });
+  p.curve([g.at(0.08).p, g.at(0.35).p, g.at(0.62).p], { jitter: 0.2 });
+  for (let i = 0; i < cuts; i++) {
+    const s = 0.4 + (0.45 * (i + 0.5)) / cuts;
+    for (const side of [1, -1] as const) {
+      const f = g.at(s);
+      const e = g.at(s + 0.1);
+      const w0 = width * prof(s) * 1.05;
+      p.line(
+        f.p[0] + f.n[0] * side * w0,
+        f.p[1] + f.n[1] * side * w0,
+        e.p[0] + e.n[0] * side * w0 * 0.25,
+        e.p[1] + e.n[1] * side * w0 * 0.25,
+      );
+    }
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* App icon motif: Caracas palm + hand-lettered "HOY?"                */
 /* ------------------------------------------------------------------ */
@@ -391,18 +422,18 @@ export const iconArt = sketch(200, 200, 29, (p) => {
     4,
   );
   const C: Pt = [106, 54];
-  const f = (pts: Pt[], w: number, teeth: number) => serratedFrond(p, [C, ...pts], w, teeth);
+  const f = (pts: Pt[], w: number, cuts: number) => leafFrond(p, [C, ...pts], w, cuts);
   p.w(5.5);
-  f([[124, 38], [146, 30], [166, 34]], 26, 4);
-  f([[128, 56], [146, 70], [154, 92]], 24, 4);
-  f([[88, 38], [66, 30], [44, 36]], 26, 4);
-  f([[86, 56], [66, 68], [56, 90]], 24, 4);
-  f([[106, 34], [114, 20], [128, 10]], 18, 3);
+  f([[130, 34], [158, 38], [176, 60]], 11, 3);
+  f([[82, 34], [54, 38], [36, 60]], 11, 3);
+  f([[126, 64], [138, 82], [140, 104]], 9, 2);
+  f([[86, 64], [74, 82], [72, 104]], 9, 2);
+  f([[110, 30], [122, 14], [140, 8]], 8, 2);
   p.w(5);
-  p.push(34, 58);
+  p.push(168, 100);
   sparkle(p, 7);
   p.pop();
-  p.dot(172, 64, 3.2);
+  p.dot(40, 100, 3.2);
   p.w(10);
   // H
   p.line(46, 134, 47, 182).line(74, 132, 73, 180).line(47, 158, 73, 156);

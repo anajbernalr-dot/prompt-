@@ -24,7 +24,7 @@ const hasCategory = (draft: PlanDraft) => !!inferCategory(draft);
 const normalize = (s: string) =>
   s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
 
@@ -67,7 +67,10 @@ function PlacePicker({ category, initial }: { category: PlanCategory; initial: P
       : pool;
   const picked = getPlace(placeId);
   if (!q && picked && !placeList.some((p) => p.id === picked.id)) placeList = [picked, ...placeList];
-  const eventList = [...events].sort((a, b) => a.date.localeCompare(b.date));
+  const now = Date.now();
+  const eventList = events
+    .filter((e) => e.id === eventId || new Date(e.date).getTime() > now)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   const next = () => {
     if (!valid) return;

@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   top: { alignItems: 'flex-end', marginRight: -8, marginBottom: -18 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 22, marginBottom: 20 },
   names: { flex: 1, gap: 2 },
-  asterisk: { position: 'absolute', right: 6, bottom: 4 },
+  asterisk: { position: 'absolute', left: 90, top: -2 },
   section: { marginTop: 22, marginBottom: 20 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   sectionTitle: { fontFamily: fonts.sansMedium, fontSize: 19, lineHeight: 24, color: colors.text },

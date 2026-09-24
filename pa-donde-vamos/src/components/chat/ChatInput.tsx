@@ -59,5 +59,5 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  input: { flex: 1, height: '100%', fontFamily: fonts.sans, fontSize: 15.5, color: colors.text, outlineStyle: 'none' },
+  input: { flex: 1, height: '100%', fontFamily: fonts.sans, fontSize: 15.5, color: colors.text, outlineStyle: 'none' } as object,
 });
