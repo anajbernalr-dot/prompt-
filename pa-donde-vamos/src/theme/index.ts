@@ -48,6 +48,9 @@ export const fonts = {
   // Hand-drawn accents
   marker: 'PermanentMarker_400Regular',
   hand: 'CoveredByYourGrace_400Regular',
+  // Welcome display lettering only
+  displayCondensed: 'AbrilFatface_400Regular',
+  script: 'CaveatBrush_400Regular',
 } as const;
 
 export const spacing = {

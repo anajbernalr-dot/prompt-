@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -9,6 +10,9 @@ import { DetailNotFound } from '@/components/detail/DetailNotFound';
 import { priceValue } from '@/components/detail/hours';
 import { InfoRow } from '@/components/detail/InfoRow';
 import { TicketSheet } from '@/components/detail/TicketSheet';
+import { HowToGet } from '@/components/detail/HowToGet';
+import { eventSpot } from '@/components/home/spots';
+import { ReviewsSection } from '@/components/reviews/ReviewsSection';
 import { VibesNote } from '@/components/detail/VibesNote';
 import { Checkbox } from '@/components/Fields';
 import { BackButton } from '@/components/Header';
@@ -76,6 +80,17 @@ function EventDetail({ event }: { event: AppEvent }) {
     setSheetKey((k) => k + 1);
     setSheetOpen(true);
   };
+
+  const openTickets = async () => {
+    if (!event.ticketUrl) return;
+    tap();
+    try {
+      await WebBrowser.openBrowserAsync(event.ticketUrl);
+    } catch {
+      showToast('No pudimos abrir la página', 'alert-circle');
+    }
+  };
+  const showTicketCta = free || !!event.ticketUrl;
 
   const goWithFriends = () => {
     useAppStore.getState().resetDraft({ category: 'evento', eventId: event.id, date: event.date });
@@ -159,13 +174,24 @@ function EventDetail({ event }: { event: AppEvent }) {
             </Pressable>
 
             <View style={styles.ctas}>
-              <Button
-                label={ticketCount > 0 ? (free ? 'Reservar más' : 'Comprar más') : free ? 'Reservar cupo' : 'Comprar entradas'}
-                variant="accent"
-                fullWidth={false}
-                onPress={openSheet}
-                style={styles.cta}
-              />
+              {showTicketCta ? (
+                <View>
+                  <Button
+                    label={free ? (ticketCount > 0 ? 'Reservar más' : 'Reservar cupo') : 'Comprar entradas'}
+                    variant="accent"
+                    fullWidth={false}
+                    iconRight={free ? undefined : 'external-link'}
+                    onPress={free ? openSheet : openTickets}
+                    accessibilityLabel={free ? undefined : 'Comprar entradas en la página oficial'}
+                    style={styles.cta}
+                  />
+                  {!free ? (
+                    <AppText variant="small" color="rgba(255,255,255,0.6)" style={styles.caption}>
+                      Te llevamos a la página oficial del evento
+                    </AppText>
+                  ) : null}
+                </View>
+              ) : null}
               <Button
                 label="Ir con mis panas"
                 variant="light"
@@ -181,7 +207,17 @@ function EventDetail({ event }: { event: AppEvent }) {
         <VibesNote style={styles.note} />
       </View>
 
-      <TicketSheet key={sheetKey} event={event} visible={sheetOpen} onClose={() => setSheetOpen(false)} />
+      <View style={styles.below}>
+        <HowToGet
+          spot={eventSpot(event)}
+          lat={event.lat}
+          lng={event.lng}
+          address={`${event.venue}, ${event.zone}`}
+        />
+        <ReviewsSection target={{ kind: 'event', id: event.id }} />
+      </View>
+
+      {free ? <TicketSheet key={sheetKey} event={event} visible={sheetOpen} onClose={() => setSheetOpen(false)} /> : null}
     </Screen>
   );
 }
@@ -248,5 +284,7 @@ const styles = StyleSheet.create({
   saveLabel: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   ctas: { marginTop: 16, gap: 12 },
   cta: { width: '64%' },
+  caption: { marginTop: 8, marginLeft: 4 },
+  below: { paddingHorizontal: 22, paddingBottom: 40 },
   note: { position: 'absolute', right: -2, bottom: -14 },
 });

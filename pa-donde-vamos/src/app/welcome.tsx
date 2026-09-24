@@ -13,7 +13,7 @@ export default function WelcomeScreen() {
   const contentWidth = Math.min(width, maxContentWidth) - gutter * 2;
   // Shrink the art on short phones so the whole screen fits without scrolling.
   const artWidth = Math.max(180, Math.min(contentWidth, (height - 540) / 0.8));
-  const titleSize = Math.min(58, contentWidth * 0.165);
+  const titleSize = Math.min(62, contentWidth * 0.178);
 
   return (
     <Screen
@@ -30,10 +30,10 @@ export default function WelcomeScreen() {
 
       <FadeIn delay={150}>
         <View accessible accessibilityRole="header" accessibilityLabel="Pa' donde vamos hoy?">
-          <AppText style={[styles.title, { fontSize: titleSize, lineHeight: titleSize * 0.98 }]}>
+          <AppText style={[styles.title, { fontSize: titleSize, lineHeight: titleSize * 1.02 }]}>
             {"PA' DONDE\nVAMOS"}
           </AppText>
-          <AppText style={[styles.hoy, { fontSize: titleSize * 1.28, lineHeight: titleSize * 1.36 }]}>HOY?</AppText>
+          <AppText style={[styles.hoy, { fontSize: titleSize * 1.42, lineHeight: titleSize * 1.5 }]}>HOY?</AppText>
         </View>
       </FadeIn>
 
@@ -47,21 +47,21 @@ export default function WelcomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { justifyContent: 'center', paddingTop: 12 },
+  content: { justifyContent: 'center' },
   art: { alignItems: 'center', marginBottom: 20 },
   title: {
-    fontFamily: fonts.serifBlack,
+    fontFamily: fonts.displayCondensed,
     color: colors.ink,
-    letterSpacing: -1.5,
+    letterSpacing: -0.5,
     textTransform: 'uppercase',
   },
   hoy: {
-    fontFamily: fonts.marker,
+    fontFamily: fonts.script,
     color: colors.blue,
-    marginTop: -2,
+    marginTop: -6,
     marginLeft: 4,
     alignSelf: 'flex-start',
-    transform: [{ skewX: '-8deg' }],
+    transform: [{ skewX: '-12deg' }],
   },
   subtitle: { marginTop: 14, maxWidth: 310 },
   buttons: { gap: 12, paddingBottom: 4 },

@@ -45,7 +45,10 @@ export function Avatar({
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.initials, { borderRadius: size / 2, backgroundColor: tint }]}>
-          <AppText style={{ fontFamily: fonts.sansSemi, fontSize: size * 0.38, color: colors.ink }}>
+          <AppText
+            numberOfLines={1}
+            allowFontScaling={false}
+            style={[styles.initialsText, { fontSize: Math.round(size * 0.38), lineHeight: Math.round(size * 0.38 * 1.25) }]}>
             {initials(name)}
           </AppText>
         </View>
@@ -97,7 +100,10 @@ export function AvatarStack({
             styles.more,
             { width: size, height: size, borderRadius: size / 2, marginLeft: shown.length ? -size * 0.28 : 0 },
           ]}>
-          <AppText style={{ fontFamily: fonts.sansSemi, fontSize: size * 0.34, color: colors.textMuted }}>
+          <AppText
+            numberOfLines={1}
+            allowFontScaling={false}
+            style={[styles.initialsText, { color: colors.textMuted, fontSize: Math.round(size * 0.34), lineHeight: Math.round(size * 0.34 * 1.25) }]}>
             +{rest}
           </AppText>
         </View>
@@ -107,7 +113,17 @@ export function AvatarStack({
 }
 
 const styles = StyleSheet.create({
-  initials: { alignItems: 'center', justifyContent: 'center' },
+  initials: { alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  initialsText: {
+    fontFamily: fonts.sansSemi,
+    color: colors.ink,
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    letterSpacing: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
   online: { position: 'absolute', backgroundColor: '#3BB273', borderWidth: 2, borderColor: colors.background },
   stack: { flexDirection: 'row', alignItems: 'center' },
   more: {

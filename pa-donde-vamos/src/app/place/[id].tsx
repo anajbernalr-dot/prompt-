@@ -7,7 +7,10 @@ import { Chip } from '@/components/Chip';
 import { DetailNotFound } from '@/components/detail/DetailNotFound';
 import { FriendsGoing } from '@/components/detail/FriendsGoing';
 import { isOpenAt, useNow } from '@/components/detail/hours';
+import { HowToGet } from '@/components/detail/HowToGet';
 import { InfoRow } from '@/components/detail/InfoRow';
+import { placeSpot } from '@/components/home/spots';
+import { ReviewsSection } from '@/components/reviews/ReviewsSection';
 import { BackButton } from '@/components/Header';
 import { FilledIcon } from '@/components/Icon';
 import { Screen } from '@/components/Screen';
@@ -153,6 +156,10 @@ function PlaceDetail({ place }: { place: Place }) {
       </View>
 
       <FriendsGoing placeId={place.id} />
+
+      <HowToGet spot={placeSpot(place)} lat={place.lat} lng={place.lng} address={`${place.address}, ${place.zone}`} />
+
+      <ReviewsSection target={{ kind: 'place', id: place.id }} />
     </Screen>
   );
 }

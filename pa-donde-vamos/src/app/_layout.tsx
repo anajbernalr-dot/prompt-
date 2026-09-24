@@ -1,3 +1,5 @@
+import { AbrilFatface_400Regular } from '@expo-google-fonts/abril-fatface';
+import { CaveatBrush_400Regular } from '@expo-google-fonts/caveat-brush';
 import { CoveredByYourGrace_400Regular } from '@expo-google-fonts/covered-by-your-grace';
 import {
   DMSans_400Regular,
@@ -48,6 +50,8 @@ export default function RootLayout() {
     DMSans_700Bold,
     PermanentMarker_400Regular,
     CoveredByYourGrace_400Regular,
+    AbrilFatface_400Regular,
+    CaveatBrush_400Regular,
   });
   const hydrated = useAppStore((s) => s.hydrated);
   const loggedIn = useAppStore((s) => s.user !== null);

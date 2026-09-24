@@ -29,7 +29,7 @@ export default function ConnectScreen() {
 
   return (
     <Screen contentStyle={styles.content}>
-      <FadeIn>
+      <FadeIn style={styles.top}>
         <AppText variant="h1" accessibilityRole="header" style={styles.title}>
           {'Conecta con\ntus panas'}
         </AppText>
@@ -69,10 +69,11 @@ export default function ConnectScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingTop: 36 },
+  content: { justifyContent: 'space-between' },
+  top: { marginTop: 28 },
   title: { fontSize: 38, lineHeight: 44, letterSpacing: -0.8 },
   intro: { marginTop: 12, maxWidth: 330, lineHeight: 24 },
-  art: { alignItems: 'center', marginTop: 24 },
+  art: { alignItems: 'center', marginVertical: 24 },
   avatars: { flexDirection: 'row', gap: 6, marginTop: 14 },
   more: {
     width: 56,
@@ -82,7 +83,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttons: { gap: 12, marginTop: 28 },
+  buttons: { gap: 12 },
   noteArea: { alignSelf: 'flex-end', marginTop: 20, marginRight: 4, paddingLeft: 30, paddingBottom: 16 },
   note: { textAlign: 'left' },
   starA: { position: 'absolute', left: 0, top: 6 },

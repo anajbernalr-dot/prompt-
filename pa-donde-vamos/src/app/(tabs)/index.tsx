@@ -5,23 +5,22 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { IconButton } from '@/components/Button';
 import { ChipRow } from '@/components/Chip';
 import { SearchBar } from '@/components/Fields';
-import { FeaturedCard } from '@/components/home/FeaturedCard';
 import { PlanCta } from '@/components/home/PlanCta';
 import { PlanRow } from '@/components/home/PlanRow';
 import { SpotCard } from '@/components/home/SpotCard';
-import { eventsByDate, FILTER_CATEGORY, FILTERS, featuredFor, nearbyFor, type FilterKey } from '@/components/home/spots';
-import { WeekEventCard } from '@/components/home/WeekEventCard';
+import { FILTER_CATEGORY, FILTERS, nearbyFor, type FilterKey } from '@/components/home/spots';
 import { Icon } from '@/components/Icon';
+import { Asterisk } from '@/components/illustrations';
+import { targetInfo, useAllReviews, useAuthorResolver } from '@/components/reviews/data';
+import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { Screen } from '@/components/Screen';
 import { Card, SectionTitle } from '@/components/Surfaces';
-import { AppText, Title } from '@/components/Typography';
+import { AppText, Handwritten, Title } from '@/components/Typography';
 import { getEvent } from '@/data/events';
 import { getPlace } from '@/data/places';
 import { firstName } from '@/lib/format';
 import { selectUnreadCount, sortPlans, useAppStore } from '@/store/useAppStore';
-import { colors, fonts, gutter } from '@/theme';
-
-const WEEK_MS = 7 * 86_400_000;
+import { colors, fonts, gutter, radius } from '@/theme';
 
 export default function HomeScreen() {
   const userName = useAppStore((s) => s.user?.name ?? '');
@@ -30,8 +29,18 @@ export default function HomeScreen() {
   const [filter, setFilter] = useState<FilterKey>('todo');
   const [now] = useState(() => Date.now());
 
-  const featured = useMemo(() => featuredFor(filter), [filter]);
-  const nearby = useMemo(() => nearbyFor(filter, featured?.id), [filter, featured]);
+  const nearby = useMemo(() => nearbyFor(filter).slice(0, 6), [filter]);
+  const allReviews = useAllReviews();
+  const resolve = useAuthorResolver();
+  const feed = useMemo(() => {
+    const cat = FILTER_CATEGORY[filter];
+    return allReviews.filter((r) => {
+      if (filter === 'todo') return true;
+      const t = targetInfo(r.target);
+      if (!t) return false;
+      return filter === 'eventos' ? t.kind === 'event' : t.category === cat;
+    });
+  }, [allReviews, filter]);
 
   const upcoming = useMemo(() => {
     const cat = FILTER_CATEGORY[filter];
@@ -45,11 +54,6 @@ export default function HomeScreen() {
       .slice(0, 3);
   }, [plans, filter, now]);
 
-  const weekEvents = useMemo(
-    () => eventsByDate().filter((e) => new Date(e.date).getTime() - now < WEEK_MS),
-    [now],
-  );
-  const showWeekEvents = filter === 'todo' && weekEvents.length > 0;
   const hello = firstName(userName);
 
   return (
@@ -58,6 +62,14 @@ export default function HomeScreen() {
         <AppText style={styles.hello} numberOfLines={1}>
           {hello ? `Hola, ${hello}` : 'Hola'}
         </AppText>
+        <Pressable
+          onPress={() => router.push('/review/new')}
+          accessibilityRole="button"
+          accessibilityLabel="Escribir una reseña"
+          style={({ pressed }) => [styles.reviewPill, pressed && { opacity: 0.8 }]}>
+          <Icon name="plus" size={16} color={colors.white} />
+          <AppText style={styles.reviewPillText}>Reseñar</AppText>
+        </Pressable>
         <IconButton
           accessibilityLabel={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
           size={44}
@@ -74,10 +86,50 @@ export default function HomeScreen() {
 
       <ChipRow options={FILTERS} value={filter} onChange={setFilter} style={styles.chips} />
 
-      {featured ? <FeaturedCard key={featured.id} spot={featured} /> : null}
+      <View style={styles.feedHead}>
+        <Handwritten rotate={-4} size={21}>
+          Lo que dicen tus panas
+        </Handwritten>
+        <Asterisk width={20} style={styles.feedAsterisk} />
+      </View>
 
+      {feed.length === 0 ? (
+        <View style={styles.empty}>
+          <AppText style={styles.emptyText}>Nadie ha reseñado nada por aquí todavía.</AppText>
+          <Pressable onPress={() => router.push('/review/new')} accessibilityRole="button" hitSlop={8}>
+            <AppText style={styles.link}>Sé el primero →</AppText>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {feed.map((r, i) => {
+        const author = resolve(r.authorId);
+        if (!author) return null;
+        return (
+          <View key={r.id}>
+            {i > 0 ? <View style={styles.sep} /> : null}
+            <ReviewCard review={r} author={author} />
+            {i === 1 || (i === feed.length - 1 && feed.length < 2) ? (
+              <Interlude nearby={nearby} upcoming={upcoming} />
+            ) : null}
+          </View>
+        );
+      })}
+
+      {feed.length === 0 ? <Interlude nearby={nearby} upcoming={upcoming} /> : null}
+
+      <View style={styles.section}>
+        <PlanCta />
+      </View>
+    </Screen>
+  );
+}
+
+function Interlude({ nearby, upcoming }: { nearby: ReturnType<typeof nearbyFor>; upcoming: ReturnType<typeof sortPlans> }) {
+  return (
+    <View style={styles.interlude}>
       {nearby.length ? (
-        <View style={styles.section}>
+        <View>
           <SectionTitle right={<LinkText label="Ver mapa" onPress={() => router.push('/map')} />}>
             Cerca de ti
           </SectionTitle>
@@ -87,12 +139,11 @@ export default function HomeScreen() {
             style={styles.bleed}
             contentContainerStyle={styles.rail}>
             {nearby.map((s) => (
-              <SpotCard key={s.id} spot={s} />
+              <SpotCard key={s.id} spot={s} width={140} height={130} />
             ))}
           </ScrollView>
         </View>
       ) : null}
-
       {upcoming.length ? (
         <View style={styles.section}>
           <SectionTitle right={<LinkText label="Ver todos" onPress={() => router.push('/saved?tab=planes')} />}>
@@ -105,29 +156,7 @@ export default function HomeScreen() {
           </Card>
         </View>
       ) : null}
-
-      <View style={styles.section}>
-        <PlanCta />
-      </View>
-
-      {showWeekEvents ? (
-        <View style={styles.section}>
-          <SectionTitle
-            right={<LinkText label="Ver todos" onPress={() => router.push('/explore?cat=eventos')} />}>
-            Eventos esta semana
-          </SectionTitle>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.bleed}
-            contentContainerStyle={styles.rail}>
-            {weekEvents.map((e) => (
-              <WeekEventCard key={e.id} event={e} />
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-    </Screen>
+    </View>
   );
 }
 
@@ -163,5 +192,29 @@ const styles = StyleSheet.create({
   bleed: { marginHorizontal: -gutter, flexGrow: 0 },
   rail: { paddingHorizontal: gutter, gap: 12 },
   plansCard: { paddingVertical: 4 },
+  reviewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 36,
+    paddingHorizontal: 13,
+    marginRight: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.ink,
+  },
+  reviewPillText: { fontFamily: fonts.sansSemi, fontSize: 13.5, color: colors.white },
+  feedHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, marginBottom: 2 },
+  feedAsterisk: { marginTop: -8 },
+  sep: { height: 1, backgroundColor: colors.border },
+  interlude: {
+    marginTop: 8,
+    marginBottom: 12,
+    paddingVertical: 20,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+  },
+  empty: { alignItems: 'center', gap: 8, paddingVertical: 30 },
+  emptyText: { fontFamily: fonts.sans, fontSize: 15, color: colors.textMuted },
   link: { fontFamily: fonts.sansSemi, fontSize: 14, color: colors.blue },
 });
