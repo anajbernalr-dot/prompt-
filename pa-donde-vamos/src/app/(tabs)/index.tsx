@@ -2,6 +2,9 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { AskComposer } from '@/components/ask/AskComposer';
+import { useAllQuestions } from '@/components/ask/data';
+import { QuestionCard } from '@/components/ask/QuestionCard';
 import { IconButton } from '@/components/Button';
 import { ChipRow } from '@/components/Chip';
 import { SearchBar } from '@/components/Fields';
@@ -41,6 +44,14 @@ export default function HomeScreen() {
       return filter === 'eventos' ? t.kind === 'event' : t.category === cat;
     });
   }, [allReviews, filter]);
+
+  const questions = useAllQuestions();
+  // Questions mix into the "Todo" feed, newest first, with reviews.
+  const items = useMemo(() => {
+    const qs = filter === 'todo' ? questions.map((q) => ({ kind: 'q' as const, at: q.at, q })) : [];
+    const rs = feed.map((r) => ({ kind: 'r' as const, at: r.at, r }));
+    return [...qs, ...rs].sort((a, b) => b.at.localeCompare(a.at));
+  }, [questions, feed, filter]);
 
   const upcoming = useMemo(() => {
     const cat = FILTER_CATEGORY[filter];
@@ -86,6 +97,8 @@ export default function HomeScreen() {
 
       <ChipRow options={FILTERS} value={filter} onChange={setFilter} style={styles.chips} />
 
+      <AskComposer />
+
       <View style={styles.feedHead}>
         <Handwritten rotate={-4} size={21}>
           Lo que dicen tus panas
@@ -102,21 +115,22 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {feed.map((r, i) => {
-        const author = resolve(r.authorId);
+      {items.map((it, i) => {
+        const authorId = it.kind === 'q' ? it.q.authorId : it.r.authorId;
+        const author = resolve(authorId);
         if (!author) return null;
         return (
-          <View key={r.id}>
+          <View key={it.kind === 'q' ? it.q.id : it.r.id}>
             {i > 0 && i !== 2 ? <View style={styles.sep} /> : null}
-            <ReviewCard review={r} author={author} />
-            {i === 1 || (i === feed.length - 1 && feed.length < 2) ? (
+            {it.kind === 'q' ? <QuestionCard question={it.q} author={author} /> : <ReviewCard review={it.r} author={author} />}
+            {i === 1 || (i === items.length - 1 && items.length < 2) ? (
               <Interlude nearby={nearby} upcoming={upcoming} />
             ) : null}
           </View>
         );
       })}
 
-      {feed.length === 0 ? <Interlude nearby={nearby} upcoming={upcoming} /> : null}
+      {items.length === 0 ? <Interlude nearby={nearby} upcoming={upcoming} /> : null}
 
       <View style={styles.section}>
         <PlanCta />

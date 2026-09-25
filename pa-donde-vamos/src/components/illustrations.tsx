@@ -5,6 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { colors } from '@/theme';
 
+import { askArt, handArt } from './illustrations/ask';
 import type { Artwork } from './illustrations/pen';
 import {
   asteriskArt,
@@ -75,6 +76,12 @@ export const Swoosh = (p: IllustrationProps) => <Ink art={swooshArt} width={120}
 
 /** Small palm-leaf + sparkle doodle used on the event sticky note. Aspect ~ 1 : 1 */
 export const LeafDoodle = (p: IllustrationProps) => <Ink art={leafArt} width={48} {...p} />;
+
+/** Two panas chatting under a speech bubble ("Crear recomendación"). Aspect ~ 1 : 0.65 */
+export const AskScene = (p: IllustrationProps) => <Ink art={askArt} width={260} {...p} />;
+
+/** Small raised-hand doodle used on question posts. Square. */
+export const HandDoodle = (p: IllustrationProps) => <Ink art={handArt} width={44} {...p} />;
 
 /** Full-color Google "G" logo for the "Google" sign-in button. Square; `color` is ignored. */
 export function GoogleLogo({ width = 20, style }: IllustrationProps) {

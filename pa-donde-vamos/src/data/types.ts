@@ -82,7 +82,7 @@ export type ChatMessage = {
   at: string;
 };
 
-export type NotificationKind = 'invite' | 'comment' | 'wants' | 'follow' | 'reminder' | 'plan' | 'tickets';
+export type NotificationKind = 'invite' | 'comment' | 'wants' | 'follow' | 'reminder' | 'plan' | 'tickets' | 'answer';
 
 export type AppNotification = {
   id: string;
@@ -91,7 +91,7 @@ export type AppNotification = {
   /** Plain text. `boldParts` are rendered in bold inside it. */
   text: string;
   boldParts?: string[];
-  target?: { kind: 'place' | 'event' | 'plan' | 'friend'; id: string };
+  target?: { kind: 'place' | 'event' | 'plan' | 'friend' | 'question'; id: string };
   /** ISO date-time. */
   at: string;
   read: boolean;
@@ -133,6 +133,30 @@ export type Review = {
   /** Key into place/event images, or undefined to use the target's cover. */
   photo?: string;
   /** ISO date-time. */
+  at: string;
+  likes: number;
+};
+
+/** "Pide recomendaciones a tus panas" — a question posted to the feed. */
+export type Question = {
+  id: string;
+  /** 'me' or a friend / community author id. */
+  authorId: string;
+  title: string;
+  location: string;
+  body: string;
+  /** ISO date-time. */
+  at: string;
+  likes: number;
+};
+
+/** An answer in a question thread, optionally recommending a place. */
+export type Answer = {
+  id: string;
+  questionId: string;
+  authorId: string;
+  text: string;
+  placeId?: string;
   at: string;
   likes: number;
 };

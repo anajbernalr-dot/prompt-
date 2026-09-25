@@ -19,6 +19,7 @@ const routeFor: Record<NonNullable<AppNotification['target']>['kind'], string> =
   event: '/event/',
   plan: '/plans/',
   friend: '/chat/',
+  question: '/ask/',
 };
 
 export default function NotificationsScreen() {

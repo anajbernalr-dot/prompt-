@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { getEvent } from '@/data/events';
 import { getFriend } from '@/data/friends';
 import { getPlace } from '@/data/places';
+import { getSeedQuestion, questionAutoReplies, seedAnswers } from '@/data/questions';
 import {
   autoReplies,
   defaultPreferences,
@@ -14,7 +15,7 @@ import {
   seedNotifications,
   seedPlans,
 } from '@/data/seed';
-import type { AppNotification, ChatMessage, Plan, PlanDraft, Reaction, Review, User } from '@/data/types';
+import type { Answer, AppNotification, ChatMessage, Question, Plan, PlanDraft, Reaction, Review, User } from '@/data/types';
 import { makeHandle, uid } from '@/lib/format';
 
 export type Settings = {
@@ -48,6 +49,11 @@ type Data = {
   myReviews: Review[];
   /** Review ids the user liked. */
   likedReviews: string[];
+  /** Questions ("Pide recomendaciones") posted by the user. */
+  myQuestions: Question[];
+  /** Answers added in this session (user + friend auto-replies), by question id. Seed answers live in data/questions. */
+  answers: Record<string, Answer[]>;
+  likedQuestions: string[];
 };
 
 type Actions = {
@@ -86,6 +92,11 @@ type Actions = {
   deleteReview: (id: string) => void;
   toggleLikeReview: (id: string) => void;
 
+  addQuestion: (input: { title: string; location: string; body: string }) => string;
+  deleteQuestion: (id: string) => void;
+  addAnswer: (questionId: string, input: { text: string; placeId?: string }) => void;
+  toggleLikeQuestion: (id: string) => void;
+
   resetDemo: () => void;
 };
 
@@ -115,6 +126,9 @@ const initialData: Data = {
   draft: emptyDraft,
   myReviews: [],
   likedReviews: [],
+  myQuestions: [],
+  answers: {},
+  likedQuestions: [],
 };
 
 /** Sample content every new account starts with, so the app feels alive. */
@@ -134,6 +148,7 @@ function starterContent(): Partial<Data> {
 }
 
 const replyTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+let answerReplyCount = 0;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -342,6 +357,55 @@ export const useAppStore = create<AppState>()(
         set({ likedReviews: likedReviews.includes(id) ? likedReviews.filter((x) => x !== id) : [...likedReviews, id] });
       },
 
+      addQuestion: ({ title, location, body }) => {
+        const question: Question = {
+          id: uid(),
+          authorId: 'me',
+          title: title.trim(),
+          location: location.trim() || 'Caracas',
+          body: body.trim(),
+          at: new Date().toISOString(),
+          likes: 0,
+        };
+        set({ myQuestions: [question, ...get().myQuestions] });
+        scheduleAnswerReply(question.id, 2500);
+        scheduleAnswerReply(question.id, 6000);
+        return question.id;
+      },
+
+      deleteQuestion: (id) => {
+        const { myQuestions, answers, notifications } = get();
+        const rest = { ...answers };
+        delete rest[id];
+        set({
+          myQuestions: myQuestions.filter((x) => x.id !== id),
+          answers: rest,
+          notifications: notifications.filter((n) => !(n.target?.kind === 'question' && n.target.id === id)),
+        });
+      },
+
+      addAnswer: (questionId, { text, placeId }) => {
+        const clean = text.trim();
+        if (!clean && !placeId) return;
+        const answer: Answer = {
+          id: uid(),
+          questionId,
+          authorId: 'me',
+          text: clean,
+          placeId,
+          at: new Date().toISOString(),
+          likes: 0,
+        };
+        const { answers } = get();
+        set({ answers: { ...answers, [questionId]: [...(answers[questionId] ?? []), answer] } });
+        scheduleAnswerReply(questionId, 1800);
+      },
+
+      toggleLikeQuestion: (id) => {
+        const { likedQuestions } = get();
+        set({ likedQuestions: likedQuestions.includes(id) ? likedQuestions.filter((x) => x !== id) : [...likedQuestions, id] });
+      },
+
       resetDemo: () => {
         const user = get().user;
         set({ ...starterContent(), user, onboarded: true });
@@ -349,8 +413,8 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'pa-donde-vamos',
-      version: 2,
-      // v2 added reviews; older saved state just gets the new empty fields.
+      version: 3,
+      // v2 added reviews, v3 questions; older saved state just gets the new empty fields.
       migrate: (state) => ({ ...initialData, ...(state as object) }) as AppState,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: ({ hydrated: _hydrated, ...rest }) =>
@@ -361,6 +425,42 @@ export const useAppStore = create<AppState>()(
     },
   ),
 );
+
+/** A friend answers a question thread after `delay` ms, recommending a place (and notifies if it's your question). */
+function scheduleAnswerReply(questionId: string, delay: number) {
+  const key = `q:${questionId}:${delay}`;
+  clearTimeout(replyTimers[key]);
+  replyTimers[key] = setTimeout(() => {
+    const s = useAppStore.getState();
+    if (!s.user) return;
+    const mine = s.myQuestions.find((x) => x.id === questionId);
+    const question = mine ?? getSeedQuestion(questionId);
+    if (!question) return;
+    const thread = s.answers[questionId] ?? [];
+    const taken = new Set([...seedAnswers.filter((x) => x.questionId === questionId), ...thread].map((x) => x.authorId));
+    const pool = questionAutoReplies.filter((r) => r.friendId !== question.authorId && !taken.has(r.friendId));
+    const list = pool.length ? pool : questionAutoReplies.filter((r) => r.friendId !== question.authorId);
+    const reply = list[answerReplyCount++ % list.length];
+    const at = new Date().toISOString();
+    const answer: Answer = { id: uid(), questionId, authorId: reply.friendId, text: reply.text, placeId: reply.placeId, at, likes: 0 };
+    const patch: Partial<Data> = { answers: { ...s.answers, [questionId]: [...thread, answer] } };
+    if (mine) {
+      const name = getFriend(reply.friendId)?.name ?? 'Un pana';
+      const note: AppNotification = {
+        id: uid(),
+        kind: 'answer',
+        friendId: reply.friendId,
+        text: `${name} respondió a tu recomendación ${question.title}`,
+        boldParts: [name, question.title],
+        target: { kind: 'question', id: questionId },
+        at,
+        read: false,
+      };
+      patch.notifications = [note, ...s.notifications];
+    }
+    useAppStore.setState(patch);
+  }, delay);
+}
 
 // ---------- Selectors & helpers ----------
 
