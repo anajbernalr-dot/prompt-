@@ -40,3 +40,32 @@ export const avatarImages: Record<string, ImageSourcePropType> = {
 export const placeImage = (key: string) => placeImages[key];
 export const eventImage = (key: string) => eventImages[key];
 export const avatarImage = (key?: string | null) => (key ? avatarImages[key] : undefined);
+
+export const dishImages: Record<string, ImageSourcePropType> = {
+  'avo-toast': require('@/assets/photos/dishes/avo-toast.jpg'),
+  pancakes: require('@/assets/photos/dishes/pancakes.jpg'),
+  cappuccino: require('@/assets/photos/dishes/cappuccino.jpg'),
+  tostado: require('@/assets/photos/dishes/tostado.jpg'),
+  matcha: require('@/assets/photos/dishes/matcha.jpg'),
+  arepa: require('@/assets/photos/dishes/arepa.jpg'),
+  cachapa: require('@/assets/photos/dishes/cachapa.jpg'),
+  pargo: require('@/assets/photos/dishes/pargo.jpg'),
+  tequenos: require('@/assets/photos/dishes/tequenos.jpg'),
+  mojito: require('@/assets/photos/dishes/mojito.jpg'),
+  cocktail: require('@/assets/photos/dishes/cocktail.jpg'),
+  'flat-white': require('@/assets/photos/dishes/flat-white.jpg'),
+  croissant: require('@/assets/photos/dishes/croissant.jpg'),
+  burger: require('@/assets/photos/dishes/burger.jpg'),
+};
+
+/** Generic venue shots used for photo grids / friend galleries. */
+export const galleryImages: Record<string, ImageSourcePropType> = {
+  'cafe-table': require('@/assets/photos/gallery/cafe-table.jpg'),
+  'latte-art': require('@/assets/photos/gallery/latte-art.jpg'),
+  pastries: require('@/assets/photos/gallery/pastries.jpg'),
+  facade: require('@/assets/photos/gallery/facade.jpg'),
+  terrace: require('@/assets/photos/gallery/terrace.jpg'),
+  'bar-counter': require('@/assets/photos/gallery/bar-counter.jpg'),
+  'friends-table': require('@/assets/photos/gallery/friends-table.jpg'),
+  'night-patio': require('@/assets/photos/gallery/night-patio.jpg'),
+};
